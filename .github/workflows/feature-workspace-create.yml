@@ -54,7 +54,7 @@ jobs:
       - name: Install CLI tool
         run: |
           pip install --upgrade pip
-          pip install git+https://github.com/BralaBee-LEIT/usf_fabric_cli_cicd.git
+          pip install git+https://github.com/BralaBee-LEIT/usf_fabric_cli_cicd_codebase.git
 
       - name: Extract branch info
         id: branch
