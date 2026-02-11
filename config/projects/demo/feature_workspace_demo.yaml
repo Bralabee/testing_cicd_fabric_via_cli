@@ -40,3 +40,6 @@ principals:
   - id: ${AZURE_CLIENT_ID}
     role: Admin
     description: Service Principal for CI/CD automation
+  - id: ${DEV_ADMIN_OBJECT_ID}
+    role: Admin
+    description: Workspace admin user/group for portal access
