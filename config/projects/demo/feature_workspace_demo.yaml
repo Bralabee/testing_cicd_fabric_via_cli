@@ -1,0 +1,42 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Demo Project Configuration — Feature Workspace Demo
+#
+# This is a minimal project config used by the GitHub Actions workflows
+# to create and destroy feature workspaces in Microsoft Fabric.
+# ─────────────────────────────────────────────────────────────────────────────
+
+workspace:
+  name: fabric-cicd-demo
+  display_name: Fabric CICD Demo
+  description: Test workspace for demonstrating feature branch isolation
+  capacity_id: ${FABRIC_CAPACITY_ID}
+  domain: ${FABRIC_DOMAIN_NAME}
+  git_repo: ${GIT_REPO_URL}
+  git_branch: main
+  git_directory: /
+
+environments:
+  dev:
+    workspace:
+      name: fabric-cicd-demo
+      capacity_id: ${FABRIC_CAPACITY_ID}
+
+folders:
+  - Bronze
+  - Silver
+  - Gold
+
+lakehouses:
+  - name: lh_bronze
+    folder: Bronze
+    description: Raw data ingestion landing zone
+
+notebooks:
+  - name: demo_notebook
+    folder: Bronze
+    description: Sample notebook for demo purposes
+
+principals:
+  - id: ${AZURE_CLIENT_ID}
+    role: Contributor
+    description: Service Principal for CI/CD automation
