@@ -38,5 +38,5 @@ notebooks:
 
 principals:
   - id: ${AZURE_CLIENT_ID}
-    role: Contributor
+    role: Admin
     description: Service Principal for CI/CD automation
