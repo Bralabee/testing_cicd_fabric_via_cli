@@ -43,6 +43,7 @@ jobs:
       - name: Install CLI tool
         run: |
           pip install --upgrade pip
+          pip install ms-fabric-cli
           pip install git+https://${{ secrets.FABRIC_GITHUB_TOKEN }}@github.com/BralaBee-LEIT/usf_fabric_cli_cicd_codebase.git
 
       - name: Extract branch info
