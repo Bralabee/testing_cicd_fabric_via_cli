@@ -55,19 +55,15 @@ principals:
 # ─────────────────────────────────────────────────────────────────────────────
 # Deployment Pipeline — connects Dev → Test → Prod workspaces
 #
-# IMPORTANT: This pipeline must be created MANUALLY in the Fabric portal
-# (Fabric > Deployment Pipelines > + New Pipeline), then workspaces are
-# assigned to each stage. The CLI uses this config to find the pipeline
-# by name and promote content between stages.
+# The deployer AUTOMATICALLY creates the pipeline and assigns workspaces
+# to stages when `fabric-cicd deploy` runs with this config. No manual
+# steps needed in the Fabric portal.
 #
-# Steps to set up the Deployment Pipeline:
-#   1. Go to Fabric portal > Deployment Pipelines
-#   2. Create a new pipeline named "fabric-cicd-demo-pipeline"
-#   3. Assign workspaces:
-#      - Development stage → fabric-cicd-demo-dev
-#      - Test stage        → fabric-cicd-demo-test
-#      - Production stage  → fabric-cicd-demo-prod
-#   4. The promote workflow then uses the CLI to automate deployments
+# What happens automatically during base workspace deployment:
+#   1. Pipeline "fabric-cicd-demo-pipeline" is created (or reused if exists)
+#   2. Test and Prod workspaces are created (or reused if they exist)
+#   3. All workspaces are assigned to their respective pipeline stages
+#   4. The promote workflows can then automate Dev → Test → Prod promotions
 # ─────────────────────────────────────────────────────────────────────────────
 deployment_pipeline:
   pipeline_name: "fabric-cicd-demo-pipeline"

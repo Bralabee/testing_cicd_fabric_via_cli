@@ -84,12 +84,15 @@ jobs:
           echo "| **Config** | \`config/projects/demo/base_workspace.yaml\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **Triggered by** | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### What was deployed" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Dev workspace created and Git-synced to \`main\`" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Deployment Pipeline \`fabric-cicd-demo-pipeline\` created" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Test and Prod workspaces created and assigned to pipeline" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
-          echo "1. Go to **Fabric portal → Deployment Pipelines**" >> $GITHUB_STEP_SUMMARY
-          echo "2. Create pipeline \`fabric-cicd-demo-pipeline\`" >> $GITHUB_STEP_SUMMARY
-          echo "3. Assign **Dev** workspace to Development stage" >> $GITHUB_STEP_SUMMARY
-          echo "4. Create **Test** and **Prod** workspaces and assign to their stages" >> $GITHUB_STEP_SUMMARY
-          echo "5. You are now ready to use feature branches!" >> $GITHUB_STEP_SUMMARY
+          echo "1. Create a \`feature/*\` branch to test the feature workspace lifecycle" >> $GITHUB_STEP_SUMMARY
+          echo "2. Merge a PR to \`main\` to trigger automatic Dev → Test promotion" >> $GITHUB_STEP_SUMMARY
+          echo "3. Manually trigger **Promote Test → Prod** workflow when ready" >> $GITHUB_STEP_SUMMARY
 
       - name: Report failure
         if: failure()
