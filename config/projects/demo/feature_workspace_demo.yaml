@@ -37,9 +37,8 @@ notebooks:
     description: Sample notebook for demo purposes
 
 principals:
-  - id: ${AZURE_CLIENT_ID}
-    role: Admin
-    description: Service Principal for CI/CD automation
   - id: ${DEV_ADMIN_OBJECT_ID}
     role: Admin
     description: Workspace admin user/group for portal access
+  # Note: The deploying Service Principal automatically has Admin access
+  # to workspaces it creates. No need to add it explicitly.
