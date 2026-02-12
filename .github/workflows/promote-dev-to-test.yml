@@ -1,0 +1,116 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Promote Dev → Test — GitHub Actions Workflow
+#
+# Triggered AUTOMATICALLY when code is pushed to `main` (typically after a
+# feature branch PR is merged). This promotes the Dev workspace content to
+# the Test workspace via the Fabric Deployment Pipeline.
+#
+# Flow:
+#   Feature PR merged → main updated → Dev workspace Git-syncs automatically
+#   → This workflow fires → CLI promotes Dev → Test
+#
+# Ref: https://learn.microsoft.com/en-us/fabric/cicd/deployment-pipelines/
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: Promote Dev → Test
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - '.github/CODEOWNERS'
+      - '.github/dependabot.yml'
+      - '.github/copilot-instructions.md'
+      - '.github/PULL_REQUEST_TEMPLATE.md'
+
+  # Allow manual trigger for re-runs
+  workflow_dispatch:
+
+# Only one promotion at a time
+concurrency:
+  group: promote-dev-to-test
+  cancel-in-progress: false
+
+jobs:
+  promote-dev-to-test:
+    name: Promote Development → Test
+    runs-on: ubuntu-latest
+
+    env:
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install CLI tool
+        run: |
+          pip install --upgrade pip
+          pip install ms-fabric-cli
+          pip install git+https://${{ secrets.FABRIC_GITHUB_TOKEN }}@github.com/BralaBee-LEIT/usf_fabric_cli_cicd_codebase.git
+
+      - name: Verify credentials
+        run: |
+          for var in AZURE_TENANT_ID AZURE_CLIENT_ID AZURE_CLIENT_SECRET; do
+            if [ -z "${!var}" ]; then
+              echo "::error::Required secret $var is not configured"
+              exit 1
+            fi
+          done
+          echo "✅ Credentials verified"
+
+      - name: Wait for Fabric Git Sync
+        run: |
+          echo "⏳ Waiting 30s for Fabric to sync main branch to Dev workspace..."
+          sleep 30
+
+      - name: Promote Dev → Test
+        run: |
+          PIPELINE_NAME=$(python -c "
+          import yaml
+          config = yaml.safe_load(open('config/projects/demo/base_workspace.yaml'))
+          print(config.get('deployment_pipeline', {}).get('pipeline_name', ''))
+          ")
+
+          if [ -z "$PIPELINE_NAME" ]; then
+            echo "::error::No deployment_pipeline.pipeline_name found in config"
+            exit 1
+          fi
+
+          echo "🚀 Promoting via pipeline: $PIPELINE_NAME"
+          echo "   Source: Development → Target: Test"
+
+          fabric-cicd promote \
+            --pipeline-name "$PIPELINE_NAME" \
+            --source-stage "Development" \
+            --target-stage "Test" \
+            --note "Auto-promote from main push (commit: ${{ github.sha }})"
+
+      - name: Report promotion success
+        if: success()
+        run: |
+          echo "## ✅ Promotion: Development → Test" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|:---|:---|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Pipeline** | Read from \`base_workspace.yaml\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Source** | Development |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Target** | Test |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Commit** | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Triggered by** | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+
+      - name: Report failure
+        if: failure()
+        run: |
+          echo "## ❌ Promotion Failed: Dev → Test" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Commit: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "Check the logs above for details." >> $GITHUB_STEP_SUMMARY

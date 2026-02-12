@@ -1,0 +1,98 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Initial Environment Setup — GitHub Actions Workflow
+#
+# Run ONCE (manually) to provision the base Dev/Test/Prod workspaces and
+# connect them to a Fabric Deployment Pipeline. This is the STARTING POINT
+# before any feature branch work begins.
+#
+# After this workflow runs successfully:
+#   - Dev workspace exists and is Git-synced to `main`
+#   - Test and Prod workspaces exist (content promoted via Deployment Pipeline)
+#   - Feature branches can now create isolated workspaces
+#
+# Usage: Actions → "Setup Base Workspaces" → Run workflow
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: Setup Base Workspaces
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy (dev deploys the main Dev workspace)'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+
+jobs:
+  setup-base-workspaces:
+    name: Deploy Base Dev Workspace
+    runs-on: ubuntu-latest
+
+    env:
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      GITHUB_TOKEN_FABRIC: ${{ secrets.FABRIC_GITHUB_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.FABRIC_GITHUB_TOKEN }}
+      FABRIC_CAPACITY_ID: ${{ secrets.FABRIC_CAPACITY_ID }}
+      DEV_ADMIN_OBJECT_ID: ${{ secrets.DEV_ADMIN_OBJECT_ID }}
+      GIT_REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install CLI tool
+        run: |
+          pip install --upgrade pip
+          pip install ms-fabric-cli
+          pip install git+https://${{ secrets.FABRIC_GITHUB_TOKEN }}@github.com/BralaBee-LEIT/usf_fabric_cli_cicd_codebase.git
+
+      - name: Verify credentials
+        run: |
+          for var in AZURE_TENANT_ID AZURE_CLIENT_ID AZURE_CLIENT_SECRET FABRIC_CAPACITY_ID; do
+            if [ -z "${!var}" ]; then
+              echo "::error::Required secret $var is not configured"
+              exit 1
+            fi
+          done
+          echo "✅ All required credentials verified"
+
+      - name: Deploy Dev workspace
+        run: |
+          echo "📦 Deploying base Dev workspace..."
+          fabric-cicd deploy \
+            config/projects/demo/base_workspace.yaml \
+            --env ${{ inputs.environment }}
+
+      - name: Report setup complete
+        if: success()
+        run: |
+          echo "## ✅ Base Workspace Setup Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|:---|:---|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Environment** | \`${{ inputs.environment }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Config** | \`config/projects/demo/base_workspace.yaml\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Triggered by** | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "1. Go to **Fabric portal → Deployment Pipelines**" >> $GITHUB_STEP_SUMMARY
+          echo "2. Create pipeline \`fabric-cicd-demo-pipeline\`" >> $GITHUB_STEP_SUMMARY
+          echo "3. Assign **Dev** workspace to Development stage" >> $GITHUB_STEP_SUMMARY
+          echo "4. Create **Test** and **Prod** workspaces and assign to their stages" >> $GITHUB_STEP_SUMMARY
+          echo "5. You are now ready to use feature branches!" >> $GITHUB_STEP_SUMMARY
+
+      - name: Report failure
+        if: failure()
+        run: |
+          echo "## ❌ Base Workspace Setup Failed" >> $GITHUB_STEP_SUMMARY
+          echo "Check the logs above for details." >> $GITHUB_STEP_SUMMARY

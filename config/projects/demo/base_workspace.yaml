@@ -1,0 +1,83 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Base Workspace Configuration — Dev / Test / Prod
+#
+# This config defines the MAIN Dev workspace that is the source of truth.
+# It is deployed once (initial setup) and stays connected to `main` branch.
+# Feature workspaces branch off of this. After features merge back to main,
+# the Fabric Deployment Pipeline promotes content: Dev → Test → Prod.
+#
+# Lifecycle:
+#   1. Deploy this config → creates Dev workspace with Git sync to `main`
+#   2. Feature branches create isolated workspaces (feature_workspace_demo.yaml)
+#   3. Feature merges to `main` → Dev workspace auto-syncs via Fabric Git Sync
+#   4. GitHub Actions calls `fabric-cicd promote` → Dev → Test → Prod
+# ─────────────────────────────────────────────────────────────────────────────
+
+workspace:
+  name: fabric-cicd-demo-dev
+  display_name: Fabric CICD Demo - Development
+  description: Main development workspace — Git-synced to main branch
+  capacity_id: ${FABRIC_CAPACITY_ID}
+  git_repo: ${GIT_REPO_URL}
+  git_branch: main
+  git_directory: /
+
+environments:
+  dev:
+    workspace:
+      name: fabric-cicd-demo-dev
+      capacity_id: ${FABRIC_CAPACITY_ID}
+
+# Folder structure (shared across all environments)
+folders:
+  - Bronze
+  - Silver
+  - Gold
+
+# Lakehouse resources
+lakehouses:
+  - name: lh_bronze
+    folder: Bronze
+    description: Raw data ingestion landing zone
+
+# Notebooks
+notebooks:
+  - name: demo_notebook
+    folder: Bronze
+    description: Sample notebook for demo purposes
+
+# Access control
+principals:
+  - id: ${DEV_ADMIN_OBJECT_ID}
+    role: Admin
+    description: Workspace admin for portal access
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Deployment Pipeline — connects Dev → Test → Prod workspaces
+#
+# IMPORTANT: This pipeline must be created MANUALLY in the Fabric portal
+# (Fabric > Deployment Pipelines > + New Pipeline), then workspaces are
+# assigned to each stage. The CLI uses this config to find the pipeline
+# by name and promote content between stages.
+#
+# Steps to set up the Deployment Pipeline:
+#   1. Go to Fabric portal > Deployment Pipelines
+#   2. Create a new pipeline named "fabric-cicd-demo-pipeline"
+#   3. Assign workspaces:
+#      - Development stage → fabric-cicd-demo-dev
+#      - Test stage        → fabric-cicd-demo-test
+#      - Production stage  → fabric-cicd-demo-prod
+#   4. The promote workflow then uses the CLI to automate deployments
+# ─────────────────────────────────────────────────────────────────────────────
+deployment_pipeline:
+  pipeline_name: "fabric-cicd-demo-pipeline"
+  stages:
+    development:
+      workspace_name: fabric-cicd-demo-dev
+      capacity_id: ${FABRIC_CAPACITY_ID}
+    test:
+      workspace_name: fabric-cicd-demo-test
+      capacity_id: ${FABRIC_CAPACITY_ID}
+    production:
+      workspace_name: fabric-cicd-demo-prod
+      capacity_id: ${FABRIC_CAPACITY_ID}

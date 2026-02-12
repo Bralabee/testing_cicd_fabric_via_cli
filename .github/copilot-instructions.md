@@ -1,20 +1,26 @@
 # GitHub Copilot Instructions for Fabric CI/CD Test Repo
 
-**Consumer repository** for testing the `usf_fabric_cli_cicd` Feature Branch Workspace automation pattern with Microsoft Fabric and GitHub Actions.
+**Consumer repository** demonstrating the complete Microsoft Fabric CI/CD lifecycle — from environment setup through feature branch development to Deployment Pipeline promotion — using `usf_fabric_cli_cicd` CLI and GitHub Actions.
 
 ## 🏗 Architecture
 
-This is a **consumer repo** — it doesn't contain application code. It demonstrates the automated feature workspace lifecycle:
+This is a **consumer repo** — it doesn't contain application code. It demonstrates the full lifecycle:
 
 ```
-Developer pushes feature/X branch
-  → GitHub Actions: feature-workspace-create.yml
-    → Installs CLI from BralaBee-LEIT/usf_fabric_cli_cicd
-      → fabric-cicd deploy → Fabric workspace created + Git-connected
+PHASE 1 — SETUP (once):
+  workflow_dispatch → setup-base-workspaces.yml
+    → fabric-cicd deploy base_workspace.yaml → Dev workspace created
+  Fabric Portal: Create Deployment Pipeline, assign Dev/Test/Prod workspaces
 
-Developer merges PR to main
-  → GitHub Actions: feature-workspace-cleanup.yml
-    → fabric-cicd destroy → Workspace deleted, capacity freed
+PHASE 2 — FEATURE DEVELOPMENT (per feature):
+  Developer pushes feature/X
+    → feature-workspace-create.yml → Workspace created + Git-connected
+  Developer merges PR to main
+    → feature-workspace-cleanup.yml → Workspace destroyed, capacity freed
+
+PHASE 3 — PROMOTION (after merge):
+  Push to main → promote-dev-to-test.yml → Auto-promote Dev → Test
+  workflow_dispatch → promote-test-to-prod.yml → Manual promote Test → Prod
 ```
 
 ### Project Structure
@@ -22,8 +28,11 @@ Developer merges PR to main
 fabric_cicd_test_repo/
 ├── .github/
 │   ├── workflows/
+│   │   ├── setup-base-workspaces.yml     # One-time Dev workspace setup
 │   │   ├── feature-workspace-create.yml  # Auto-provision on feature/* push
-│   │   └── feature-workspace-cleanup.yml # Auto-destroy on branch delete/merge
+│   │   ├── feature-workspace-cleanup.yml # Auto-destroy on branch delete/merge
+│   │   ├── promote-dev-to-test.yml       # Auto-promote Dev → Test on push to main
+│   │   └── promote-test-to-prod.yml      # Manual promote Test → Prod
 │   ├── copilot-instructions.md
 │   ├── PULL_REQUEST_TEMPLATE.md
 │   ├── CODEOWNERS
@@ -31,7 +40,8 @@ fabric_cicd_test_repo/
 ├── config/
 │   └── projects/
 │       └── demo/
-│           └── feature_workspace_demo.yaml  # Workspace config template
+│           ├── base_workspace.yaml            # Dev workspace + Deployment Pipeline config
+│           └── feature_workspace_demo.yaml    # Feature branch workspace template
 ├── README.md
 └── Makefile
 ```
@@ -47,8 +57,14 @@ Configure in **Settings → Secrets and variables → Actions**:
 | `AZURE_CLIENT_SECRET` | Service Principal secret |
 | `FABRIC_GITHUB_TOKEN` | PAT for Fabric Git integration |
 | `FABRIC_CAPACITY_ID` | Fabric capacity for workspaces |
+| `DEV_ADMIN_OBJECT_ID` | Object ID for workspace admin |
 
 ## 🛠 Workflows
+
+### Setup Base Workspaces (`setup-base-workspaces.yml`)
+- **Trigger**: `workflow_dispatch` (manual, run once)
+- **Action**: Deploys Dev workspace from `base_workspace.yaml`
+- **Next**: Create Deployment Pipeline in Fabric portal, assign workspaces to stages
 
 ### Feature Workspace Create (`feature-workspace-create.yml`)
 - **Trigger**: Push to `feature/**` branch
@@ -59,9 +75,23 @@ Configure in **Settings → Secrets and variables → Actions**:
 - **Trigger**: Branch delete (after PR merge) or `workflow_dispatch`
 - **Action**: Destroys the feature workspace, frees capacity
 
+### Promote Dev → Test (`promote-dev-to-test.yml`)
+- **Trigger**: Push to `main` (auto, after PR merge)
+- **Action**: Waits for Fabric Git Sync, then promotes via Deployment Pipeline
+- **Config**: Reads `pipeline_name` from `base_workspace.yaml`
+
+### Promote Test → Prod (`promote-test-to-prod.yml`)
+- **Trigger**: `workflow_dispatch` with safety gate (type "PROMOTE")
+- **Action**: Promotes Test stage content to Production via Deployment Pipeline
+
 ## 📝 Configuration
 
-### YAML Config (`config/projects/demo/feature_workspace_demo.yaml`)
+### Base Workspace (`config/projects/demo/base_workspace.yaml`)
+- Defines the Dev workspace connected to `main` branch
+- Includes `deployment_pipeline:` section with pipeline name and stage workspace names
+- Used by setup and promotion workflows
+
+### Feature Workspace (`config/projects/demo/feature_workspace_demo.yaml`)
 - Uses `${VAR_NAME}` env var substitution for all secrets
 - Workspace name derived from branch name
 - Resources, lakehouses, and notebooks defined declaratively
@@ -76,7 +106,7 @@ Configure in **Settings → Secrets and variables → Actions**:
 
 ## 🔗 Related Projects
 
-- **usf_fabric_cli_cicd**: The CLI library this repo consumes (v1.7.5)
+- **usf_fabric_cli_cicd**: The CLI library this repo consumes (v1.7.6)
 - **usf-fabric-cicd**: Legacy monolith version
 
 ## 🔄 CI/CD Protocols (MANDATORY)

@@ -1,0 +1,126 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Promote Test → Production — GitHub Actions Workflow
+#
+# Triggered MANUALLY with an approval gate. This is the final promotion step
+# that pushes validated Test content to the Production workspace.
+#
+# Flow:
+#   Dev → Test (auto) ✅ → QA validates in Test → Manual trigger → Test → Prod
+#
+# Usage: Actions → "Promote Test → Production" → Run workflow
+#
+# Ref: https://learn.microsoft.com/en-us/fabric/cicd/deployment-pipelines/
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: Promote Test → Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_promotion:
+        description: 'Type "PROMOTE" to confirm production deployment'
+        required: true
+        type: string
+      deployment_note:
+        description: 'Deployment note (shown in Fabric pipeline history)'
+        required: false
+        default: 'Production promotion via GitHub Actions'
+        type: string
+
+# Only one production promotion at a time
+concurrency:
+  group: promote-test-to-prod
+  cancel-in-progress: false
+
+jobs:
+  promote-test-to-prod:
+    name: Promote Test → Production
+    runs-on: ubuntu-latest
+    # Safety: require explicit confirmation
+    if: github.event.inputs.confirm_promotion == 'PROMOTE'
+
+    env:
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install CLI tool
+        run: |
+          pip install --upgrade pip
+          pip install ms-fabric-cli
+          pip install git+https://${{ secrets.FABRIC_GITHUB_TOKEN }}@github.com/BralaBee-LEIT/usf_fabric_cli_cicd_codebase.git
+
+      - name: Verify credentials
+        run: |
+          for var in AZURE_TENANT_ID AZURE_CLIENT_ID AZURE_CLIENT_SECRET; do
+            if [ -z "${!var}" ]; then
+              echo "::error::Required secret $var is not configured"
+              exit 1
+            fi
+          done
+          echo "✅ Credentials verified"
+
+      - name: Promote Test → Production
+        run: |
+          PIPELINE_NAME=$(python -c "
+          import yaml
+          config = yaml.safe_load(open('config/projects/demo/base_workspace.yaml'))
+          print(config.get('deployment_pipeline', {}).get('pipeline_name', ''))
+          ")
+
+          if [ -z "$PIPELINE_NAME" ]; then
+            echo "::error::No deployment_pipeline.pipeline_name found in config"
+            exit 1
+          fi
+
+          echo "🚀 Promoting via pipeline: $PIPELINE_NAME"
+          echo "   Source: Test → Target: Production"
+          echo "   Note: ${{ inputs.deployment_note }}"
+
+          fabric-cicd promote \
+            --pipeline-name "$PIPELINE_NAME" \
+            --source-stage "Test" \
+            --target-stage "Production" \
+            --note "${{ inputs.deployment_note }}"
+
+      - name: Report promotion success
+        if: success()
+        run: |
+          echo "## ✅ Promotion: Test → Production" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|:---|:---|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Pipeline** | Read from \`base_workspace.yaml\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Source** | Test |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Target** | Production |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Note** | ${{ inputs.deployment_note }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Triggered by** | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+
+      - name: Report failure
+        if: failure()
+        run: |
+          echo "## ❌ Promotion Failed: Test → Production" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Check the logs above for details." >> $GITHUB_STEP_SUMMARY
+
+  rejected:
+    name: Promotion Rejected
+    runs-on: ubuntu-latest
+    if: github.event.inputs.confirm_promotion != 'PROMOTE'
+    steps:
+      - name: Rejection notice
+        run: |
+          echo "## ⚠️ Production Promotion Rejected" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo 'You must type **PROMOTE** (exact match) to confirm.' >> $GITHUB_STEP_SUMMARY
+          echo "Received: \`${{ inputs.confirm_promotion }}\`" >> $GITHUB_STEP_SUMMARY
+          exit 1
