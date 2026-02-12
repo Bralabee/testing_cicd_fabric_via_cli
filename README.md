@@ -50,3 +50,4 @@ Developer merges PR to main
     → CLI calls Fabric API to destroy the feature workspace
 ```
 
+# Trigger CI/CD with fixed CLI
