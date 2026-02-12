@@ -1,0 +1,66 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# CI Pipeline — Configuration Validation
+#
+# Validates YAML configurations on every push/PR to catch errors
+# before they reach the deployment workflows.
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'config/**'
+      - '.github/workflows/**'
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate-config:
+    name: Validate Configuration
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate YAML syntax
+        run: |
+          echo "Validating YAML files..."
+          for f in config/**/*.yaml config/**/*.yml; do
+            if [ -f "$f" ]; then
+              python3 -c "import yaml; yaml.safe_load(open('$f'))" 2>&1 || {
+                echo "::error::Invalid YAML syntax in $f"
+                exit 1
+              }
+              echo "✅ $f"
+            fi
+          done
+
+      - name: Check required environment variable placeholders
+        run: |
+          echo "Checking env var substitution patterns..."
+          for f in config/**/*.yaml; do
+            if [ -f "$f" ]; then
+              # Verify config uses ${VAR} patterns, not hardcoded values
+              if grep -qP '(client_id|client_secret|tenant_id|capacity_id):\s*["\x27]?[a-f0-9-]{36}' "$f"; then
+                echo "::error::Hardcoded credential found in $f — use \${VAR_NAME} substitution"
+                exit 1
+              fi
+            fi
+          done
+          echo "✅ No hardcoded credentials detected"
+
+      - name: Validate workflow files
+        run: |
+          echo "Checking workflow YAML syntax..."
+          for f in .github/workflows/*.yml; do
+            if [ -f "$f" ]; then
+              python3 -c "import yaml; yaml.safe_load(open('$f'))" 2>&1 || {
+                echo "::error::Invalid YAML syntax in $f"
+                exit 1
+              }
+              echo "✅ $f"
+            fi
+          done

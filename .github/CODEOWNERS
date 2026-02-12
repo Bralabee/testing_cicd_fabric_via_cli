@@ -1,0 +1,12 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# CODEOWNERS — Automatic reviewer assignment for pull requests
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Default owners
+*                                   @BralaBee-LEIT
+
+# Workspace configuration
+config/                             @BralaBee-LEIT
+
+# CI/CD workflows
+.github/                            @BralaBee-LEIT
