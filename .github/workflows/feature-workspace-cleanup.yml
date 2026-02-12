@@ -88,6 +88,7 @@ jobs:
 
           echo "🧹 Destroying feature workspace: $WS_NAME"
 
+          # destroy is idempotent — exits 0 if workspace already gone
           fabric-cicd destroy \
             "$CONFIG_FILE" \
             --force \
