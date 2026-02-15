@@ -1,0 +1,184 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Promote Dev → Test — MULTI-PROJECT variant
+#
+# Triggered when code is pushed to `main`. Auto-discovers ALL projects
+# in config/projects/ and promotes each one's Dev → Test pipeline.
+#
+# Uses a matrix strategy: each project is promoted in parallel as a
+# separate job, so one project's failure doesn't block the others.
+#
+# To make this MANUAL instead of automatic, change the trigger:
+#   on:
+#     workflow_dispatch:
+#       inputs:
+#         project:
+#           type: choice
+#           options: [demo, sales_analytics]
+#
+# Ref: https://learn.microsoft.com/en-us/fabric/cicd/deployment-pipelines/
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: Promote Dev → Test
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - '.github/CODEOWNERS'
+      - '.github/dependabot.yml'
+      - '.github/copilot-instructions.md'
+      - '.github/PULL_REQUEST_TEMPLATE.md'
+      - '.github/multi-project-workflows/**'
+
+  # Allow manual trigger for re-runs
+  workflow_dispatch:
+    inputs:
+      project:
+        description: 'Project to promote (leave empty for ALL projects)'
+        required: false
+        type: string
+        default: ''
+
+# Only one promotion run at a time
+concurrency:
+  group: promote-dev-to-test
+  cancel-in-progress: false
+
+jobs:
+  # ── Step 1: Discover which projects to promote ──────────────────────────
+  discover-projects:
+    name: Discover Projects
+    runs-on: ubuntu-latest
+    outputs:
+      projects: ${{ steps.find.outputs.projects }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Find projects with deployment pipelines
+        id: find
+        run: |
+          if [ -n "${{ inputs.project }}" ]; then
+            # Manual trigger with specific project
+            PROJECTS='["${{ inputs.project }}"]'
+          else
+            # Auto-discover all projects that have a base_workspace.yaml
+            # with a deployment_pipeline section
+            PROJECTS=$(python3 -c "
+          import os, json, yaml
+          projects = []
+          base = 'config/projects'
+          if os.path.isdir(base):
+              for proj in sorted(os.listdir(base)):
+                  cfg = os.path.join(base, proj, 'base_workspace.yaml')
+                  if os.path.isfile(cfg):
+                      with open(cfg) as f:
+                          config = yaml.safe_load(f)
+                      if config.get('deployment_pipeline', {}).get('pipeline_name'):
+                          projects.append(proj)
+          print(json.dumps(projects))
+          ")
+          fi
+
+          echo "projects=$PROJECTS" >> $GITHUB_OUTPUT
+          echo "📋 Projects to promote: $PROJECTS"
+
+  # ── Step 2: Promote each project in parallel ────────────────────────────
+  promote:
+    name: Promote ${{ matrix.project }} Dev → Test
+    needs: discover-projects
+    if: needs.discover-projects.outputs.projects != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project: ${{ fromJson(needs.discover-projects.outputs.projects) }}
+
+    env:
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      PROJECT_PREFIX: ${{ vars.PROJECT_PREFIX || 'fabric-cicd-demo' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Install CLI tool
+        run: |
+          pip install --upgrade pip
+          pip install ms-fabric-cli==${{ vars.FABRIC_CLI_VERSION || '1.3.1' }}
+          pip install "git+https://${{ secrets.FABRIC_GITHUB_TOKEN }}@${{ vars.CLI_REPO_URL || 'github.com/BralaBee-LEIT/usf_fabric_cli_cicd_codebase' }}.git@${{ vars.CLI_REPO_REF || 'v1.7.6' }}"
+
+      - name: Verify credentials
+        run: |
+          for var in AZURE_TENANT_ID AZURE_CLIENT_ID AZURE_CLIENT_SECRET; do
+            if [ -z "${!var}" ]; then
+              echo "::error::Required secret $var is not configured"
+              exit 1
+            fi
+          done
+          echo "✅ Credentials verified"
+
+      - name: Wait for Fabric Git Sync
+        run: |
+          echo "⏳ Waiting for Fabric to sync main branch to Dev workspace..."
+          for i in $(seq 1 6); do
+            echo "  ⏱️  Waiting... (${i}0s / 60s)"
+            sleep 10
+          done
+          echo "✅ Wait complete. Proceeding with promotion."
+
+      - name: Promote Dev → Test
+        run: |
+          CONFIG="config/projects/${{ matrix.project }}/base_workspace.yaml"
+
+          PIPELINE_NAME=$(python -c "
+          import os, re, yaml
+          config = yaml.safe_load(open('$CONFIG'))
+          name = config.get('deployment_pipeline', {}).get('pipeline_name', '')
+          name = re.sub(r'\\\$\{(\w+)\}', lambda m: os.environ.get(m.group(1), m.group(0)), name)
+          print(name)
+          ")
+
+          if [ -z "$PIPELINE_NAME" ]; then
+            echo "::error::No deployment_pipeline.pipeline_name found in $CONFIG"
+            exit 1
+          fi
+
+          echo "🚀 Promoting ${{ matrix.project }} via pipeline: $PIPELINE_NAME"
+          echo "   Source: Development → Target: Test"
+
+          fabric-cicd promote \
+            --pipeline-name "$PIPELINE_NAME" \
+            --source-stage "Development" \
+            --target-stage "Test" \
+            --note "Auto-promote ${{ matrix.project }} from main push (commit: ${{ github.sha }})"
+
+      - name: Report promotion success
+        if: success()
+        run: |
+          echo "## ✅ Promotion: ${{ matrix.project }} Development → Test" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|:---|:---|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Project** | \`${{ matrix.project }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Pipeline** | Read from \`base_workspace.yaml\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Source** | Development |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Target** | Test |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Commit** | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Triggered by** | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+
+      - name: Report failure
+        if: failure()
+        run: |
+          echo "## ❌ Promotion Failed: ${{ matrix.project }} Dev → Test" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Commit: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "Check the logs above for details." >> $GITHUB_STEP_SUMMARY

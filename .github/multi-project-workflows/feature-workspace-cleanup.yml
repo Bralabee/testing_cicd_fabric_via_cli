@@ -1,0 +1,160 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Feature Workspace Cleanup — MULTI-PROJECT variant
+#
+# Triggered when a PR to main is merged (and the feature branch is deleted).
+# Destroys the corresponding isolated Fabric workspace to free capacity.
+#
+# MULTI-PROJECT CONVENTION:
+#   Branch name: feature/<project>/<feature-name>
+#   The project name is extracted to find the correct config.
+#
+# Ref: https://learn.microsoft.com/en-us/fabric/cicd/git-integration/manage-branches
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: Cleanup Feature Workspace
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+  # Allow manual cleanup for orphaned workspaces
+  workflow_dispatch:
+    inputs:
+      branch_name:
+        description: 'Feature branch name (e.g., feature/demo/my-feature)'
+        required: true
+        type: string
+
+# Prevent parallel cleanup of the same workspace
+concurrency:
+  group: cleanup-${{ github.event.pull_request.head.ref || inputs.branch_name || 'manual' }}
+  cancel-in-progress: false
+
+jobs:
+  cleanup-feature-workspace:
+    # Only run when a feature branch PR is merged, or manual trigger
+    if: >
+      (github.event_name == 'pull_request' && github.event.pull_request.merged == true &&
+       startsWith(github.event.pull_request.head.ref, 'feature/')) ||
+      github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+
+    env:
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      PROJECT_PREFIX: ${{ vars.PROJECT_PREFIX || 'fabric-cicd-demo' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Install CLI tool
+        run: |
+          pip install --upgrade pip
+          pip install ms-fabric-cli==${{ vars.FABRIC_CLI_VERSION || '1.3.1' }}
+          pip install "git+https://${{ secrets.FABRIC_GITHUB_TOKEN }}@${{ vars.CLI_REPO_URL || 'github.com/BralaBee-LEIT/usf_fabric_cli_cicd_codebase' }}.git@${{ vars.CLI_REPO_REF || 'v1.7.6' }}"
+
+      - name: Extract branch and project info
+        id: branch
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            BRANCH_NAME="${{ github.event.pull_request.head.ref }}"
+          else
+            BRANCH_NAME="${{ inputs.branch_name }}"
+          fi
+
+          AFTER_FEATURE="${BRANCH_NAME#feature/}"
+
+          if [[ "$AFTER_FEATURE" == *"/"* ]]; then
+            # Multi-project: feature/<project>/<feature>
+            PROJECT_NAME="${AFTER_FEATURE%%/*}"
+            FEATURE_NAME="${AFTER_FEATURE#*/}"
+          else
+            # Fallback: feature/<feature> (uses default project)
+            PROJECT_NAME="${{ vars.DEFAULT_PROJECT || 'demo' }}"
+            FEATURE_NAME="$AFTER_FEATURE"
+          fi
+
+          WORKSPACE_SUFFIX=$(echo "$FEATURE_NAME" | sed 's/[^a-zA-Z0-9_-]/_/g')
+
+          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+          echo "project_name=$PROJECT_NAME" >> $GITHUB_OUTPUT
+          echo "feature_name=$FEATURE_NAME" >> $GITHUB_OUTPUT
+          echo "workspace_suffix=$WORKSPACE_SUFFIX" >> $GITHUB_OUTPUT
+
+          echo "📋 Branch: $BRANCH_NAME"
+          echo "📁 Project: $PROJECT_NAME"
+          echo "🔖 Feature: $FEATURE_NAME"
+
+      - name: Verify credentials
+        run: |
+          for var in AZURE_TENANT_ID AZURE_CLIENT_ID AZURE_CLIENT_SECRET; do
+            if [ -z "${!var}" ]; then
+              echo "::error::Required secret $var is not configured"
+              exit 1
+            fi
+          done
+          echo "✅ Credentials verified"
+
+      - name: Destroy feature workspace
+        run: |
+          PROJECT="${{ steps.branch.outputs.project_name }}"
+
+          # Locate config
+          if [ -n "${{ vars.FEATURE_WORKSPACE_CONFIG }}" ]; then
+            CONFIG_FILE="${{ vars.FEATURE_WORKSPACE_CONFIG }}"
+          elif [ -f "config/projects/$PROJECT/feature_workspace.yaml" ]; then
+            CONFIG_FILE="config/projects/$PROJECT/feature_workspace.yaml"
+          else
+            CONFIG_FILE=$(find "config/projects/$PROJECT" -name "feature_*.yaml" -type f 2>/dev/null | head -1)
+          fi
+
+          if [ -z "$CONFIG_FILE" ] || [ ! -f "$CONFIG_FILE" ]; then
+            echo "::error::Feature workspace config not found for project '$PROJECT'."
+            exit 1
+          fi
+
+          BRANCH="${{ steps.branch.outputs.branch_name }}"
+          # Derive workspace name using same logic as deployer
+          WS_SUFFIX=$(echo "${BRANCH}" | tr '/' '-' | tr '_' '-' | tr '[:upper:]' '[:lower:]')
+          BASE_NAME=$(python -c "import yaml; c=yaml.safe_load(open('$CONFIG_FILE')); print(c['workspace']['name'])")
+          WS_NAME="${BASE_NAME}-${WS_SUFFIX}"
+
+          echo "🧹 Destroying feature workspace: $WS_NAME"
+          echo "📁 Project: $PROJECT"
+
+          # destroy is idempotent — exits 0 if workspace already gone
+          if ! fabric-cicd destroy \
+            "$CONFIG_FILE" \
+            --force \
+            --workspace-name-override "$WS_NAME" 2>&1 | tee /tmp/destroy_output.txt; then
+            if grep -qi "InsufficientPrivileges\|Access is forbidden" /tmp/destroy_output.txt; then
+              echo "::warning::Workspace $WS_NAME could not be deleted (InsufficientPrivileges). Ask a Fabric Admin to delete it manually or grant the SP Workspace Admin role."
+              echo "CLEANUP_WARNING=InsufficientPrivileges" >> $GITHUB_ENV
+            elif grep -qi "not found\|does not exist" /tmp/destroy_output.txt; then
+              echo "✅ Workspace $WS_NAME already removed (not found)"
+            else
+              echo "::error::Failed to destroy workspace $WS_NAME"
+              cat /tmp/destroy_output.txt
+              exit 1
+            fi
+          fi
+
+      - name: Report cleanup
+        if: success()
+        run: |
+          echo "## 🧹 Feature Workspace Cleaned Up" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|:---|:---|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Project** | \`${{ steps.branch.outputs.project_name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Branch** | \`${{ steps.branch.outputs.branch_name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Feature** | \`${{ steps.branch.outputs.feature_name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Triggered by** | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Event** | ${{ github.event_name }} |" >> $GITHUB_STEP_SUMMARY

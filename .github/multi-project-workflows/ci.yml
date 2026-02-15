@@ -1,0 +1,85 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# CI Pipeline — MULTI-PROJECT variant
+#
+# Validates ALL project YAML configurations on every push/PR.
+# Identical to single-project CI — config validation already scans
+# all files under config/**/*.yaml recursively.
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'config/**'
+      - '.github/workflows/**'
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate-config:
+    name: Validate Configuration
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Validate YAML syntax
+        run: |
+          echo "Validating YAML files..."
+          ERRORS=0
+          for f in config/**/*.yaml config/**/*.yml; do
+            if [ -f "$f" ]; then
+              python3 -c "import yaml; yaml.safe_load(open('$f'))" 2>&1 || {
+                echo "::error::Invalid YAML syntax in $f"
+                ERRORS=$((ERRORS + 1))
+              }
+              echo "✅ $f"
+            fi
+          done
+          if [ $ERRORS -gt 0 ]; then
+            echo "::error::$ERRORS YAML file(s) have syntax errors"
+            exit 1
+          fi
+
+      - name: Check required environment variable placeholders
+        run: |
+          echo "Checking env var substitution patterns..."
+          for f in config/**/*.yaml; do
+            if [ -f "$f" ]; then
+              if grep -qP '(client_id|client_secret|tenant_id|capacity_id):\s*["\x27]?[a-f0-9-]{36}' "$f"; then
+                echo "::error::Hardcoded credential found in $f — use \${VAR_NAME} substitution"
+                exit 1
+              fi
+            fi
+          done
+          echo "✅ No hardcoded credentials detected"
+
+      - name: List discovered projects
+        run: |
+          echo "📋 Projects discovered:"
+          for d in config/projects/*/; do
+            if [ -d "$d" ]; then
+              PROJECT=$(basename "$d")
+              BASE="$d/base_workspace.yaml"
+              FEATURE=$(find "$d" -name "feature_*.yaml" -type f 2>/dev/null | head -1)
+              echo "  📁 $PROJECT"
+              [ -f "$BASE" ] && echo "      ✅ base_workspace.yaml" || echo "      ❌ base_workspace.yaml (MISSING)"
+              [ -n "$FEATURE" ] && echo "      ✅ $(basename $FEATURE)" || echo "      ⚠️  No feature_workspace config"
+            fi
+          done
+
+      - name: Validate workflow files
+        run: |
+          echo "Checking workflow YAML syntax..."
+          for f in .github/workflows/*.yml; do
+            if [ -f "$f" ]; then
+              python3 -c "import yaml; yaml.safe_load(open('$f'))" 2>&1 || {
+                echo "::error::Invalid YAML syntax in $f"
+                exit 1
+              }
+              echo "✅ $f"
+            fi
+          done

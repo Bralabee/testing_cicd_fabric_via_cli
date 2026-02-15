@@ -1,0 +1,74 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Sales Analytics — Base Workspace Configuration (Example Second Project)
+#
+# Copy this pattern when onboarding a new project into a multi-project
+# consumer repo. Each project gets its own folder under config/projects/.
+#
+# IMPORTANT: This project uses the SAME GitHub Secrets as the demo project.
+# If you need different Service Principals per project, use separate
+# consumer repos instead (see docs/WORKFLOW_OPTIONS.md).
+# ─────────────────────────────────────────────────────────────────────────────
+
+workspace:
+  name: ${PROJECT_PREFIX}-sales-dev
+  display_name: ${PROJECT_PREFIX} Sales Analytics - Development
+  description: Sales analytics development workspace — Git-synced to main branch
+  capacity_id: ${FABRIC_CAPACITY_ID}
+  git_repo: ${GIT_REPO_URL}
+  git_branch: main
+  git_directory: /
+
+environments:
+  dev:
+    workspace:
+      name: ${PROJECT_PREFIX}-sales-dev
+      capacity_id: ${FABRIC_CAPACITY_ID}
+
+# Folder structure
+folders:
+  - Bronze
+  - Silver
+  - Gold
+  - Curated
+
+# Lakehouse resources
+lakehouses:
+  - name: lh_sales_bronze
+    folder: Bronze
+    description: Raw sales data ingestion
+
+  - name: lh_sales_gold
+    folder: Gold
+    description: Curated sales aggregations
+
+# Notebooks
+notebooks:
+  - name: sales_ingestion
+    folder: Bronze
+    description: Ingest sales data from source systems
+
+  - name: sales_transform
+    folder: Silver
+    description: Clean and transform sales data
+
+# Access control
+principals:
+  - id: ${DEV_ADMIN_OBJECT_ID}
+    role: Admin
+    description: Workspace admin for portal access
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Deployment Pipeline — connects Dev → Test → Prod
+# ─────────────────────────────────────────────────────────────────────────────
+deployment_pipeline:
+  pipeline_name: "${PROJECT_PREFIX}-sales-pipeline"
+  stages:
+    development:
+      workspace_name: ${PROJECT_PREFIX}-sales-dev
+      capacity_id: ${FABRIC_CAPACITY_ID}
+    test:
+      workspace_name: ${PROJECT_PREFIX}-sales-test
+      capacity_id: ${FABRIC_CAPACITY_ID}
+    production:
+      workspace_name: ${PROJECT_PREFIX}-sales-prod
+      capacity_id: ${FABRIC_CAPACITY_ID}

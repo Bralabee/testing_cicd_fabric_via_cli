@@ -1,0 +1,40 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Sales Analytics — Feature Workspace Configuration (Example Second Project)
+# ─────────────────────────────────────────────────────────────────────────────
+
+workspace:
+  name: ${PROJECT_PREFIX}-sales
+  display_name: ${PROJECT_PREFIX} Sales Analytics
+  description: Feature workspace for sales analytics development
+  capacity_id: ${FABRIC_CAPACITY_ID}
+  domain: ${FABRIC_DOMAIN_NAME}
+  git_repo: ${GIT_REPO_URL}
+  git_branch: main
+  git_directory: /
+
+environments:
+  dev:
+    workspace:
+      name: ${PROJECT_PREFIX}-sales
+      capacity_id: ${FABRIC_CAPACITY_ID}
+
+folders:
+  - Bronze
+  - Silver
+  - Gold
+  - Curated
+
+lakehouses:
+  - name: lh_sales_bronze
+    folder: Bronze
+    description: Raw sales data ingestion
+
+notebooks:
+  - name: sales_ingestion
+    folder: Bronze
+    description: Ingest sales data from source systems
+
+principals:
+  - id: ${DEV_ADMIN_OBJECT_ID}
+    role: Admin
+    description: Workspace admin user/group for portal access

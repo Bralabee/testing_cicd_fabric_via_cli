@@ -1,0 +1,119 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Initial Environment Setup — MULTI-PROJECT variant
+#
+# Run ONCE per project to provision that project's Dev/Test/Prod workspaces
+# and connect them to a Fabric Deployment Pipeline.
+#
+# Difference from single-project: Requires a `project` input to select
+# which project under config/projects/ to deploy.
+#
+# Usage: Actions → "Setup Base Workspaces" → Run workflow → select project
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: Setup Base Workspaces
+
+on:
+  workflow_dispatch:
+    inputs:
+      project:
+        description: 'Project folder name under config/projects/'
+        required: true
+        type: choice
+        options:
+          - demo
+          - sales_analytics
+          # ➕ Add new projects here as they are onboarded
+      environment:
+        description: 'Environment to deploy (dev deploys the main Dev workspace)'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+
+jobs:
+  setup-base-workspaces:
+    name: Deploy Base Dev Workspace — ${{ inputs.project }}
+    runs-on: ubuntu-latest
+
+    env:
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      GITHUB_TOKEN_FABRIC: ${{ secrets.FABRIC_GITHUB_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.FABRIC_GITHUB_TOKEN }}
+      FABRIC_CAPACITY_ID: ${{ secrets.FABRIC_CAPACITY_ID }}
+      DEV_ADMIN_OBJECT_ID: ${{ secrets.DEV_ADMIN_OBJECT_ID }}
+      GIT_REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+      PROJECT_PREFIX: ${{ vars.PROJECT_PREFIX || 'fabric-cicd-demo' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Install CLI tool
+        run: |
+          pip install --upgrade pip
+          pip install ms-fabric-cli==${{ vars.FABRIC_CLI_VERSION || '1.3.1' }}
+          pip install "git+https://${{ secrets.FABRIC_GITHUB_TOKEN }}@${{ vars.CLI_REPO_URL || 'github.com/BralaBee-LEIT/usf_fabric_cli_cicd_codebase' }}.git@${{ vars.CLI_REPO_REF || 'v1.7.6' }}"
+
+      - name: Verify credentials
+        run: |
+          for var in AZURE_TENANT_ID AZURE_CLIENT_ID AZURE_CLIENT_SECRET FABRIC_CAPACITY_ID GITHUB_TOKEN_FABRIC DEV_ADMIN_OBJECT_ID; do
+            if [ -z "${!var}" ]; then
+              echo "::error::Required secret $var is not configured"
+              exit 1
+            fi
+          done
+          echo "All required credentials verified"
+
+      - name: Validate project config exists
+        run: |
+          CONFIG="config/projects/${{ inputs.project }}/base_workspace.yaml"
+          if [ ! -f "$CONFIG" ]; then
+            echo "::error::Config not found: $CONFIG"
+            echo "Available projects:"
+            ls -1 config/projects/ 2>/dev/null || echo "  (none)"
+            exit 1
+          fi
+          echo "✅ Config found: $CONFIG"
+
+      - name: Deploy Dev workspace
+        run: |
+          echo "📦 Deploying base Dev workspace for project: ${{ inputs.project }}"
+          fabric-cicd deploy \
+            config/projects/${{ inputs.project }}/base_workspace.yaml \
+            --env ${{ inputs.environment }}
+
+      - name: Report setup complete
+        if: success()
+        run: |
+          echo "## ✅ Base Workspace Setup Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|:---|:---|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Project** | \`${{ inputs.project }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Environment** | \`${{ inputs.environment }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Config** | \`config/projects/${{ inputs.project }}/base_workspace.yaml\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Triggered by** | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### What was deployed" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Dev workspace created and Git-synced to \`main\`" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Deployment Pipeline created (configured in base_workspace.yaml)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Test and Prod workspaces created and assigned to pipeline" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "1. Create a \`feature/${{ inputs.project }}/<name>\` branch to test the feature workspace lifecycle" >> $GITHUB_STEP_SUMMARY
+          echo "2. Merge a PR to \`main\` to trigger automatic Dev → Test promotion" >> $GITHUB_STEP_SUMMARY
+          echo "3. Manually trigger **Promote Test → Prod** workflow when ready" >> $GITHUB_STEP_SUMMARY
+
+      - name: Report failure
+        if: failure()
+        run: |
+          echo "## ❌ Base Workspace Setup Failed — ${{ inputs.project }}" >> $GITHUB_STEP_SUMMARY
+          echo "Check the logs above for details." >> $GITHUB_STEP_SUMMARY
