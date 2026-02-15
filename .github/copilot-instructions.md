@@ -28,6 +28,7 @@ PHASE 3 — PROMOTION (after merge):
 fabric_cicd_test_repo/
 ├── .github/
 │   ├── workflows/
+│   │   ├── ci.yml                        # CI validation (YAML lint, secret scan)
 │   │   ├── setup-base-workspaces.yml     # One-time Dev workspace setup
 │   │   ├── feature-workspace-create.yml  # Auto-provision on feature/* push
 │   │   ├── feature-workspace-cleanup.yml # Auto-destroy on branch delete/merge
@@ -42,8 +43,7 @@ fabric_cicd_test_repo/
 │       └── demo/
 │           ├── base_workspace.yaml            # Dev workspace + Deployment Pipeline config
 │           └── feature_workspace_demo.yaml    # Feature branch workspace template
-├── README.md
-└── Makefile
+└── README.md
 ```
 
 ## 🔐 Required Secrets

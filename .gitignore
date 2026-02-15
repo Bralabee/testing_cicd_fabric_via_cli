@@ -16,3 +16,9 @@ __pycache__/
 # OS
 .DS_Store
 Thumbs.db
+
+# Logs & Audit
+*.log
+*.jsonl
+logs/
+audit_logs/
