@@ -9,8 +9,8 @@ This is a **consumer repo** — it doesn't contain application code. It demonstr
 ```
 PHASE 1 — SETUP (once):
   workflow_dispatch → setup-base-workspaces.yml
-    → fabric-cicd deploy base_workspace.yaml → Dev workspace created
-  Fabric Portal: Create Deployment Pipeline, assign Dev/Test/Prod workspaces
+    → fabric-cicd deploy base_workspace.yaml
+    → Dev workspace created + Deployment Pipeline provisioned + Test/Prod workspaces assigned
 
 PHASE 2 — FEATURE DEVELOPMENT (per feature):
   Developer pushes feature/X
@@ -29,9 +29,9 @@ fabric_cicd_test_repo/
 ├── .github/
 │   ├── workflows/
 │   │   ├── ci.yml                        # CI validation (YAML lint, secret scan)
-│   │   ├── setup-base-workspaces.yml     # One-time Dev workspace setup
+│   │   ├── setup-base-workspaces.yml     # One-time Dev workspace + Deployment Pipeline setup
 │   │   ├── feature-workspace-create.yml  # Auto-provision on feature/* push
-│   │   ├── feature-workspace-cleanup.yml # Auto-destroy on branch delete/merge
+│   │   ├── feature-workspace-cleanup.yml # Auto-destroy on PR merge to main
 │   │   ├── promote-dev-to-test.yml       # Auto-promote Dev → Test on push to main
 │   │   └── promote-test-to-prod.yml      # Manual promote Test → Prod
 │   ├── copilot-instructions.md
@@ -43,6 +43,9 @@ fabric_cicd_test_repo/
 │       └── demo/
 │           ├── base_workspace.yaml            # Dev workspace + Deployment Pipeline config
 │           └── feature_workspace_demo.yaml    # Feature branch workspace template
+├── docs/
+│   ├── REPLICATION_GUIDE.md               # How to fork/replicate this repo
+│   └── E2E_VALIDATION_REPORT.md           # Live test results
 └── README.md
 ```
 
@@ -63,8 +66,8 @@ Configure in **Settings → Secrets and variables → Actions**:
 
 ### Setup Base Workspaces (`setup-base-workspaces.yml`)
 - **Trigger**: `workflow_dispatch` (manual, run once)
-- **Action**: Deploys Dev workspace from `base_workspace.yaml`
-- **Next**: Create Deployment Pipeline in Fabric portal, assign workspaces to stages
+- **Action**: Deploys Dev workspace, creates Deployment Pipeline, provisions Test/Prod workspaces
+- **Config**: Uses `config/projects/demo/base_workspace.yaml`
 
 ### Feature Workspace Create (`feature-workspace-create.yml`)
 - **Trigger**: Push to `feature/**` branch
@@ -72,7 +75,7 @@ Configure in **Settings → Secrets and variables → Actions**:
 - **Config**: Uses `config/projects/demo/feature_workspace_demo.yaml`
 
 ### Feature Workspace Cleanup (`feature-workspace-cleanup.yml`)
-- **Trigger**: Branch delete (after PR merge) or `workflow_dispatch`
+- **Trigger**: PR merged to `main` (auto) or `workflow_dispatch` (manual)
 - **Action**: Destroys the feature workspace, frees capacity
 
 ### Promote Dev → Test (`promote-dev-to-test.yml`)

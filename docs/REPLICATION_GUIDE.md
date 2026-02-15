@@ -57,9 +57,10 @@ This guide walks you through replicating the complete Microsoft Fabric CI/CD lif
 │    └── feature_workspace_demo.yaml  ← Feature workspace template   │
 │                                                                     │
 │  .github/workflows/                                                 │
+│    ├── ci.yml                    ← CI validation on push/PR        │
 │    ├── setup-base-workspaces.yml ← Run once (manual)               │
 │    ├── feature-workspace-create.yml  ← On push to feature/*        │
-│    ├── feature-workspace-cleanup.yml ← On PR merge                 │
+│    ├── feature-workspace-cleanup.yml ← On PR merge to main         │
 │    ├── promote-dev-to-test.yml   ← Auto on push to main            │
 │    └── promote-test-to-prod.yml  ← Manual with "PROMOTE" gate     │
 ├─────────────────────────────────────────────────────────────────────┤
@@ -528,7 +529,7 @@ The promote-dev-to-test workflow includes a 60-second wait by default. If your w
    ```bash
    # Install CLI
    pip install ms-fabric-cli==1.3.1
-   pip install "git+https://<your-pat>@<your-cli-repo>.git@main"
+   pip install "git+https://<your-pat>@<your-cli-repo>.git@v1.7.6"
 
    # Set env vars
    export AZURE_TENANT_ID=...

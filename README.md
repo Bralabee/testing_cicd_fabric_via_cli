@@ -21,9 +21,10 @@
 
 | Workflow | Trigger | Purpose |
 |:---|:---|:---|
-| `setup-base-workspaces.yml` | Manual dispatch | One-time: provision Dev workspace |
+| `ci.yml` | Push/PR | CI validation (YAML lint, secret scan) |
+| `setup-base-workspaces.yml` | Manual dispatch | One-time: provision Dev workspace + Deployment Pipeline |
 | `feature-workspace-create.yml` | Push to `feature/**` | Create isolated feature workspace |
-| `feature-workspace-cleanup.yml` | PR merge / branch delete | Destroy feature workspace |
+| `feature-workspace-cleanup.yml` | PR merged to `main` / manual | Destroy feature workspace |
 | `promote-dev-to-test.yml` | Push to `main` | Auto-promote Dev → Test via Deployment Pipeline |
 | `promote-test-to-prod.yml` | Manual dispatch + confirm | Promote Test → Prod (type "PROMOTE" to confirm) |
 
@@ -55,7 +56,7 @@ Configure in **Settings → Secrets and variables → Actions → Variables tab*
 |:---|:---|:---|
 | `PROJECT_PREFIX` | `fabric-cicd-demo` | Naming prefix for all workspaces and pipelines |
 | `CLI_REPO_URL` | `github.com/BralaBee-LEIT/usf_fabric_cli_cicd_codebase` | URL to your CLI repo (without `https://`) |
-| `CLI_REPO_REF` | `main` | Git ref (branch/tag) for CLI install |
+| `CLI_REPO_REF` | `v1.7.6` | Git ref (branch/tag) for CLI install |
 | `FABRIC_CLI_VERSION` | `1.3.1` | Microsoft Fabric CLI version |
 | `FEATURE_WORKSPACE_CONFIG` | *(auto-discovered)* | Override path to feature workspace config |
 
