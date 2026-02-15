@@ -29,8 +29,9 @@
 8. [Phase 3 — Promotion (Dev → Test → Prod)](#8-phase-3--promotion-dev--test--prod)
 9. [Verification Checklist](#9-verification-checklist)
 10. [Common Bottlenecks & Troubleshooting](#10-common-bottlenecks--troubleshooting)
-11. [Customising for Your Own Project](#11-customising-for-your-own-project)
-12. [Architecture Reference](#12-architecture-reference)
+11. [Keeping the CLI Updated](#11-keeping-the-cli-updated)
+12. [Customising for Your Own Project](#12-customising-for-your-own-project)
+13. [Architecture Reference](#13-architecture-reference)
 
 ---
 
@@ -251,7 +252,7 @@ Go to **Settings → Secrets and variables → Actions → Variables tab**.
 |----------|---------|-------------|
 | `PROJECT_PREFIX` | `fabric-cicd-demo` | Prefix for all workspace names (e.g., `myproject` → workspaces named `myproject-dev`, `myproject-test`, `myproject-prod`) |
 | `CLI_REPO_URL` | `github.com/your-org/your-cli-repo` | URL to your CLI repo (without `https://`) |
-| `CLI_REPO_REF` | `main` | Branch or tag of the CLI repo to install |
+| `CLI_REPO_REF` | `v1.7.6` | Tag (or branch) of the CLI repo to install |
 | `FABRIC_CLI_VERSION` | `1.3.1` | Version of the Microsoft `ms-fabric-cli` package |
 | `FEATURE_WORKSPACE_CONFIG` | *(auto-detected)* | Path to feature workspace config, e.g., `config/projects/demo/feature_workspace_demo.yaml` |
 
@@ -542,7 +543,65 @@ The promote-dev-to-test workflow includes a 60-second wait by default. If your w
 
 ---
 
-## 11. Customising for Your Own Project
+## 11. Keeping the CLI Updated
+
+The consumer repo installs the CLI from source via `git+https://` pinned to a **version tag**
+(e.g. `v1.7.6`). This means the CLI version only changes when you explicitly update it.
+
+### When to Update
+
+After any meaningful change to the CLI repo (new feature, bug fix, config change),
+you need to **tag the new version** in the CLI repo and **update the consumer workflows**.
+
+### Step-by-Step Update Routine
+
+```bash
+# ── In the CLI repo ──
+
+# 1. Make your code changes, commit, push
+git add -A && git commit -m "feat: your improvement"
+git push origin main
+
+# 2. Update the version in pyproject.toml
+#    e.g. version = "1.7.6" → version = "1.8.0"
+
+# 3. Tag the release
+git tag -a v1.8.0 -m "Release v1.8.0 — description of changes"
+git push origin v1.8.0
+```
+
+```bash
+# ── In the consumer repo ──
+
+# Option A: Update the default in all workflows (recommended for permanent upgrades)
+sed -i "s/vars.CLI_REPO_REF || 'v1.7.6'/vars.CLI_REPO_REF || 'v1.8.0'/g" \
+  .github/workflows/*.yml
+git add -A && git commit -m "chore: bump CLI to v1.8.0"
+git push origin main
+
+# Option B: Set a repo variable (no code change required)
+#   Settings → Variables → CLI_REPO_REF = v1.8.0
+```
+
+### What Happens If You Forget
+
+- **Nothing breaks** — workflows keep using the pinned tag (e.g. `v1.7.6`)
+- You just won't get the latest CLI features or fixes until you update
+- This is intentional: consumer repos are stable until you choose to upgrade
+
+### Quick Checklist
+
+| Step | Where | Command / Action |
+|------|-------|------------------|
+| 1. Code & push | CLI repo | `git commit` + `git push` |
+| 2. Bump version | CLI repo | Edit `pyproject.toml` |
+| 3. Tag release | CLI repo | `git tag -a vX.Y.Z` + `git push origin vX.Y.Z` |
+| 4. Update consumer | Consumer repo | `sed` the default OR set `CLI_REPO_REF` variable |
+| 5. Verify | Consumer repo | Run any workflow — check install step in logs |
+
+---
+
+## 12. Customising for Your Own Project
 
 Once you've validated the lifecycle with the demo configs, customise for your real project:
 
@@ -622,7 +681,7 @@ CLI_REPO_URL = github.com/your-org/your-cli-fork
 
 ---
 
-## 12. Architecture Reference
+## 13. Architecture Reference
 
 ### Workflow Trigger Map
 
@@ -690,7 +749,7 @@ DEV_ADMIN_OBJECT_ID      → SP's Object ID (workspace admin)
 ```
 PROJECT_PREFIX           → Default: fabric-cicd-demo
 CLI_REPO_URL             → Default: github.com/your-org/your-cli-repo
-CLI_REPO_REF             → Default: main
+CLI_REPO_REF             → Default: v1.7.6  (pinned to a release tag)
 FABRIC_CLI_VERSION       → Default: 1.3.1
 FEATURE_WORKSPACE_CONFIG → Default: auto-discovered
 ```
