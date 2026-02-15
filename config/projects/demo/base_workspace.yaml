@@ -14,8 +14,8 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 workspace:
-  name: fabric-cicd-demo-dev
-  display_name: Fabric CICD Demo - Development
+  name: ${PROJECT_PREFIX}-dev
+  display_name: ${PROJECT_PREFIX} - Development
   description: Main development workspace — Git-synced to main branch
   capacity_id: ${FABRIC_CAPACITY_ID}
   git_repo: ${GIT_REPO_URL}
@@ -25,7 +25,7 @@ workspace:
 environments:
   dev:
     workspace:
-      name: fabric-cicd-demo-dev
+      name: ${PROJECT_PREFIX}-dev
       capacity_id: ${FABRIC_CAPACITY_ID}
 
 # Folder structure (shared across all environments)
@@ -60,20 +60,20 @@ principals:
 # steps needed in the Fabric portal.
 #
 # What happens automatically during base workspace deployment:
-#   1. Pipeline "fabric-cicd-demo-pipeline" is created (or reused if exists)
+#   1. Pipeline "${PROJECT_PREFIX}-pipeline" is created (or reused if exists)
 #   2. Test and Prod workspaces are created (or reused if they exist)
 #   3. All workspaces are assigned to their respective pipeline stages
 #   4. The promote workflows can then automate Dev → Test → Prod promotions
 # ─────────────────────────────────────────────────────────────────────────────
 deployment_pipeline:
-  pipeline_name: "fabric-cicd-demo-pipeline"
+  pipeline_name: "${PROJECT_PREFIX}-pipeline"
   stages:
     development:
-      workspace_name: fabric-cicd-demo-dev
+      workspace_name: ${PROJECT_PREFIX}-dev
       capacity_id: ${FABRIC_CAPACITY_ID}
     test:
-      workspace_name: fabric-cicd-demo-test
+      workspace_name: ${PROJECT_PREFIX}-test
       capacity_id: ${FABRIC_CAPACITY_ID}
     production:
-      workspace_name: fabric-cicd-demo-prod
+      workspace_name: ${PROJECT_PREFIX}-prod
       capacity_id: ${FABRIC_CAPACITY_ID}

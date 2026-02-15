@@ -6,9 +6,9 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 workspace:
-  name: fabric-cicd-demo
-  display_name: Fabric CICD Demo
-  description: Test workspace for demonstrating feature branch isolation
+  name: ${PROJECT_PREFIX}
+  display_name: ${PROJECT_PREFIX}
+  description: Workspace for demonstrating feature branch isolation
   capacity_id: ${FABRIC_CAPACITY_ID}
   domain: ${FABRIC_DOMAIN_NAME}
   git_repo: ${GIT_REPO_URL}
@@ -18,7 +18,7 @@ workspace:
 environments:
   dev:
     workspace:
-      name: fabric-cicd-demo
+      name: ${PROJECT_PREFIX}
       capacity_id: ${FABRIC_CAPACITY_ID}
 
 folders:

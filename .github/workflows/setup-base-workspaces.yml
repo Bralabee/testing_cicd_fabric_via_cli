@@ -40,6 +40,7 @@ jobs:
       FABRIC_CAPACITY_ID: ${{ secrets.FABRIC_CAPACITY_ID }}
       DEV_ADMIN_OBJECT_ID: ${{ secrets.DEV_ADMIN_OBJECT_ID }}
       GIT_REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+      PROJECT_PREFIX: ${{ vars.PROJECT_PREFIX || 'fabric-cicd-demo' }}
 
     steps:
       - name: Checkout code
@@ -53,8 +54,8 @@ jobs:
       - name: Install CLI tool
         run: |
           pip install --upgrade pip
-          pip install ms-fabric-cli==1.3.1
-          pip install git+https://${{ secrets.FABRIC_GITHUB_TOKEN }}@github.com/BralaBee-LEIT/usf_fabric_cli_cicd_codebase.git@main
+          pip install ms-fabric-cli==${{ vars.FABRIC_CLI_VERSION || '1.3.1' }}
+          pip install "git+https://${{ secrets.FABRIC_GITHUB_TOKEN }}@${{ vars.CLI_REPO_URL || 'github.com/BralaBee-LEIT/usf_fabric_cli_cicd_codebase' }}.git@${{ vars.CLI_REPO_REF || 'main' }}"
 
       - name: Verify credentials
         run: |
@@ -86,7 +87,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### What was deployed" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ Dev workspace created and Git-synced to \`main\`" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Deployment Pipeline \`fabric-cicd-demo-pipeline\` created" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Deployment Pipeline created (configured in base_workspace.yaml)" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ Test and Prod workspaces created and assigned to pipeline" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Next Steps" >> $GITHUB_STEP_SUMMARY

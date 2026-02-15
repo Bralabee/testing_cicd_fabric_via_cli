@@ -1,1 +1,0 @@
-# Feature Demo Test - Cleanup Validation\nThis branch was used to validate the feature workspace lifecycle:\n- Workspace creation on branch push\n- Workspace destruction on merge to main\n\nTest completed: 2026-02-12 12:22 UTC

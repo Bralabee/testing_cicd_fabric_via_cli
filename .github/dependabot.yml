@@ -1,5 +1,8 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # Dependabot — Automated dependency update PRs
+#
+# UPDATE: Replace the reviewer below with your GitHub username/org
+# when forking or reusing this repo as a template.
 # ─────────────────────────────────────────────────────────────────────────────
 
 version: 2
