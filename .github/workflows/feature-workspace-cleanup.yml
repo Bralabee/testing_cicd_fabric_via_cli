@@ -80,11 +80,18 @@ jobs:
           echo "✅ Credentials verified"
 
       - name: Destroy feature workspace
+        env:
+          CONFIG_OVERRIDE: ${{ vars.FEATURE_WORKSPACE_CONFIG || '' }}
         run: |
-          CONFIG_FILE="config/projects/demo/feature_workspace_demo.yaml"
+          # Priority: repo variable > naming convention search
+          if [ -n "$CONFIG_OVERRIDE" ]; then
+            CONFIG_FILE="$CONFIG_OVERRIDE"
+          else
+            CONFIG_FILE=$(find config/projects -name "feature_*.yaml" -type f | head -1)
+          fi
 
-          if [ ! -f "$CONFIG_FILE" ]; then
-            echo "::error::Feature workspace config not found: $CONFIG_FILE"
+          if [ -z "$CONFIG_FILE" ] || [ ! -f "$CONFIG_FILE" ]; then
+            echo "::error::Feature workspace config not found. Either set the FEATURE_WORKSPACE_CONFIG repo variable or add a feature_*.yaml file under config/projects/."
             exit 1
           fi
 
