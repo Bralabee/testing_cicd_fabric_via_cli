@@ -406,7 +406,7 @@ Go to **Settings → Secrets and variables → Actions → Variables tab**.
 |----------|---------|-------------|
 | `PROJECT_PREFIX` | `fabric-cicd-demo` | Prefix for all workspace names (e.g., `myproject` → workspaces named `myproject-dev`, `myproject-test`, `myproject-prod`) |
 | `CLI_REPO_URL` | `github.com/your-org/your-cli-repo` | URL to your CLI repo (without `https://`) |
-| `CLI_REPO_REF` | `v1.7.6` | Tag (or branch) of the CLI repo to install |
+| `CLI_REPO_REF` | `v1.7.7` | Tag (or branch) of the CLI repo to install |
 | `FABRIC_CLI_VERSION` | `1.3.1` | Version of the Microsoft `ms-fabric-cli` package |
 | `FEATURE_WORKSPACE_CONFIG` | *(auto-detected)* | Path to feature workspace config, e.g., `config/projects/demo/feature_workspace_demo.yaml` |
 
@@ -868,7 +868,7 @@ The promote-dev-to-test workflow includes a 60-second wait by default. If your w
    ```bash
    # Install CLI
    pip install ms-fabric-cli==1.3.1
-   pip install "git+https://<your-pat>@<your-cli-repo>.git@v1.7.6"
+   pip install "git+https://<your-pat>@<your-cli-repo>.git@v1.7.7"
 
    # Set env vars
    export AZURE_TENANT_ID=...
@@ -886,7 +886,7 @@ The promote-dev-to-test workflow includes a 60-second wait by default. If your w
 ## 12. Keeping the CLI Updated
 
 The consumer repo installs the CLI from source via `git+https://` pinned to a **version tag**
-(e.g. `v1.7.6`). This means the CLI version only changes when you explicitly update it.
+(e.g. `v1.7.7`). This means the CLI version only changes when you explicitly update it.
 
 ### When to Update
 
@@ -903,7 +903,7 @@ git add -A && git commit -m "feat: your improvement"
 git push origin main
 
 # 2. Update the version in pyproject.toml
-#    e.g. version = "1.7.6" → version = "1.8.0"
+#    e.g. version = "1.7.7" → version = "1.8.0"
 
 # 3. Tag the release
 git tag -a v1.8.0 -m "Release v1.8.0 — description of changes"
@@ -914,7 +914,7 @@ git push origin v1.8.0
 # ── In the consumer repo ──
 
 # Option A: Update the default in all workflows (recommended for permanent upgrades)
-sed -i "s/vars.CLI_REPO_REF || 'v1.7.6'/vars.CLI_REPO_REF || 'v1.8.0'/g" \
+sed -i "s/vars.CLI_REPO_REF || 'v1.7.7'/vars.CLI_REPO_REF || 'v1.8.0'/g" \
   .github/workflows/*.yml
 git add -A && git commit -m "chore: bump CLI to v1.8.0"
 git push origin main
@@ -925,7 +925,7 @@ git push origin main
 
 ### What Happens If You Forget
 
-- **Nothing breaks** — workflows keep using the pinned tag (e.g. `v1.7.6`)
+- **Nothing breaks** — workflows keep using the pinned tag (e.g. `v1.7.7`)
 - You just won't get the latest CLI features or fixes until you update
 - This is intentional: consumer repos are stable until you choose to upgrade
 
@@ -1032,7 +1032,7 @@ from the branch path and finds the matching config under `config/projects/`.
 Set the `CLI_REPO_REF` repo variable to a specific tag or branch:
 
 ```
-CLI_REPO_REF = v1.7.6
+CLI_REPO_REF = v1.7.7
 ```
 
 ### 13.5 Use Your Own CLI Fork
@@ -1156,7 +1156,7 @@ name = re.sub(r'\$\{(\w+)\}', lambda m: os.environ.get(m.group(1), m.group(0)), 
 |----------|---------|---------|
 | `PROJECT_PREFIX` | `fabric-cicd-demo` | Prefix for all workspace names |
 | `CLI_REPO_URL` | `github.com/your-org/your-cli-repo` | CLI source repository |
-| `CLI_REPO_REF` | `v1.7.6` | CLI version tag to install |
+| `CLI_REPO_REF` | `v1.7.7` | CLI version tag to install |
 | `FABRIC_CLI_VERSION` | `1.3.1` | Microsoft Fabric CLI version |
 | `FEATURE_WORKSPACE_CONFIG` | auto-discovered | Feature workspace config path (Option A only) |
 | `DEFAULT_PROJECT` | `demo` | Fallback project name (Option B only) |

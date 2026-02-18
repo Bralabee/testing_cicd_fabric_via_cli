@@ -27,24 +27,35 @@ PHASE 3 — PROMOTION (after merge):
 ```
 fabric_cicd_test_repo/
 ├── .github/
-│   ├── workflows/
+│   ├── workflows/                         # Option A — single-project workflows (active)
 │   │   ├── ci.yml                        # CI validation (YAML lint, secret scan)
 │   │   ├── setup-base-workspaces.yml     # One-time Dev workspace + Deployment Pipeline setup
 │   │   ├── feature-workspace-create.yml  # Auto-provision on feature/* push
 │   │   ├── feature-workspace-cleanup.yml # Auto-destroy on PR merge to main
 │   │   ├── promote-dev-to-test.yml       # Auto-promote Dev → Test on push to main
 │   │   └── promote-test-to-prod.yml      # Manual promote Test → Prod
+│   ├── multi-project-workflows/           # Option B — multi-project alternative (inactive)
+│   │   ├── ci.yml
+│   │   ├── setup-base-workspaces.yml
+│   │   ├── feature-workspace-create.yml
+│   │   ├── feature-workspace-cleanup.yml
+│   │   ├── promote-dev-to-test.yml
+│   │   └── promote-test-to-prod.yml
 │   ├── copilot-instructions.md
 │   ├── PULL_REQUEST_TEMPLATE.md
 │   ├── CODEOWNERS
 │   └── dependabot.yml
 ├── config/
 │   └── projects/
-│       └── demo/
-│           ├── base_workspace.yaml            # Dev workspace + Deployment Pipeline config
-│           └── feature_workspace_demo.yaml    # Feature branch workspace template
+│       ├── demo/                              # Demo project configs
+│       │   ├── base_workspace.yaml            # Dev workspace + Deployment Pipeline config
+│       │   └── feature_workspace_demo.yaml    # Feature branch workspace template
+│       └── sales_analytics/                   # Sales Analytics project configs
+│           ├── base_workspace.yaml
+│           └── feature_workspace.yaml
 ├── docs/
 │   ├── REPLICATION_GUIDE.md               # How to fork/replicate this repo
+│   ├── WORKFLOW_OPTIONS.md                # Option A vs Option B comparison
 │   └── E2E_VALIDATION_REPORT.md           # Live test results
 └── README.md
 ```
@@ -109,7 +120,7 @@ Configure in **Settings → Secrets and variables → Actions**:
 
 ## 🔗 Related Projects
 
-- **usf_fabric_cli_cicd**: The CLI library this repo consumes (v1.7.6)
+- **usf_fabric_cli_cicd**: The CLI library this repo consumes (v1.7.7)
 - **usf-fabric-cicd**: Legacy monolith version
 
 ## 🔄 CI/CD Protocols (MANDATORY)
