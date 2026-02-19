@@ -72,7 +72,8 @@ jobs:
           echo "📦 Deploying base Dev workspace..."
           fabric-cicd deploy \
             config/projects/demo/base_workspace.yaml \
-            --env ${{ inputs.environment }}
+            --env ${{ inputs.environment }} \
+            --rollback-on-failure
 
       - name: Report setup complete
         if: success()

@@ -68,17 +68,6 @@ jobs:
           done
           echo "✅ Credentials verified"
 
-      - name: Wait for Fabric Git Sync
-        run: |
-          echo "⏳ Waiting for Fabric to sync main branch to Dev workspace..."
-          echo "  Fabric Git Sync typically completes in 30-120 seconds."
-          # Wait in increments so logs show progress
-          for i in $(seq 1 6); do
-            echo "  ⏱️  Waiting... (${i}0s / 60s)"
-            sleep 10
-          done
-          echo "✅ Wait complete. Proceeding with promotion."
-
       - name: Promote Dev → Test
         run: |
           PIPELINE_NAME=$(python -c "
@@ -101,6 +90,7 @@ jobs:
             --pipeline-name "$PIPELINE_NAME" \
             --source-stage "Development" \
             --target-stage "Test" \
+            --wait-for-git-sync 60 \
             --note "Auto-promote from main push (commit: ${{ github.sha }})"
 
       - name: Report promotion success
