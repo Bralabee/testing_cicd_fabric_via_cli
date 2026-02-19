@@ -88,6 +88,8 @@ Configure in **Settings → Secrets and variables → Actions**:
 ### Feature Workspace Cleanup (`feature-workspace-cleanup.yml`)
 - **Trigger**: PR merged to `main` (auto) or `workflow_dispatch` (manual)
 - **Action**: Destroys the feature workspace, frees capacity
+- **Safety**: Uses `--safe` by default — populated workspaces (with Fabric items) are protected. Use `force_destroy_populated: true` input to override.
+- **Exit code 2**: Indicates safety block — workspace was NOT deleted because it contains items
 
 ### Promote Dev → Test (`promote-dev-to-test.yml`)
 - **Trigger**: Push to `main` (auto, after PR merge)
@@ -117,10 +119,11 @@ Configure in **Settings → Secrets and variables → Actions**:
 3. **Secrets must be configured** in GitHub repo settings before any workflow runs
 4. **Branch naming**: Only `feature/**` branches trigger workspace creation
 5. **Capacity limits**: F2 trial capacity has low limits — clean up stale workspaces
+6. **CLI version sync**: When a new CLI version is released, update the `CLI_REPO_REF` repo variable AND the fallback version in all workflow `pip install` lines
 
 ## 🔗 Related Projects
 
-- **usf_fabric_cli_cicd**: The CLI library this repo consumes (v1.7.7)
+- **usf_fabric_cli_cicd**: The CLI library this repo consumes (v1.7.13)
 - **usf-fabric-cicd**: Legacy monolith version
 
 ## 🔄 CI/CD Protocols (MANDATORY)
