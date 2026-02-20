@@ -35,6 +35,7 @@ jobs:
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      SP_OBJECT_ID: ${{ secrets.SP_OBJECT_ID }}
       GITHUB_TOKEN_FABRIC: ${{ secrets.FABRIC_GITHUB_TOKEN }}
       GITHUB_TOKEN: ${{ secrets.FABRIC_GITHUB_TOKEN }}
       FABRIC_CAPACITY_ID: ${{ secrets.FABRIC_CAPACITY_ID }}
