@@ -38,3 +38,5 @@ principals:
   - id: ${DEV_ADMIN_OBJECT_ID}
     role: Admin
     description: Workspace admin user/group for portal access
+
+    type: Group

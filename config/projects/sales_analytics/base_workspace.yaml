@@ -60,6 +60,7 @@ principals:
 # ─────────────────────────────────────────────────────────────────────────────
 # Deployment Pipeline — connects Dev → Test → Prod
 # ─────────────────────────────────────────────────────────────────────────────
+    type: Group
 deployment_pipeline:
   pipeline_name: "${PROJECT_PREFIX}-sales-pipeline"
   stages:
@@ -68,7 +69,7 @@ deployment_pipeline:
       capacity_id: ${FABRIC_CAPACITY_ID}
     test:
       workspace_name: ${PROJECT_PREFIX}-sales-test
-      capacity_id: ${FABRIC_CAPACITY_ID}
+      capacity_id: ${FABRIC_CAPACITY_ID_TEST:-FABRIC_CAPACITY_ID}
     production:
       workspace_name: ${PROJECT_PREFIX}-sales-prod
-      capacity_id: ${FABRIC_CAPACITY_ID}
+      capacity_id: ${FABRIC_CAPACITY_ID_PROD:-FABRIC_CAPACITY_ID}

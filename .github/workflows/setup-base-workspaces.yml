@@ -38,6 +38,8 @@ jobs:
       GITHUB_TOKEN_FABRIC: ${{ secrets.FABRIC_GITHUB_TOKEN }}
       GITHUB_TOKEN: ${{ secrets.FABRIC_GITHUB_TOKEN }}
       FABRIC_CAPACITY_ID: ${{ secrets.FABRIC_CAPACITY_ID }}
+      FABRIC_CAPACITY_ID_TEST: ${{ secrets.FABRIC_CAPACITY_ID_TEST }}
+      FABRIC_CAPACITY_ID_PROD: ${{ secrets.FABRIC_CAPACITY_ID_PROD }}
       DEV_ADMIN_OBJECT_ID: ${{ secrets.DEV_ADMIN_OBJECT_ID }}
       GIT_REPO_URL: ${{ github.server_url }}/${{ github.repository }}
       PROJECT_PREFIX: ${{ vars.PROJECT_PREFIX || 'fabric-cicd-demo' }}
@@ -55,11 +57,11 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install ms-fabric-cli==${{ vars.FABRIC_CLI_VERSION || '1.3.1' }}
-          pip install "git+https://${{ secrets.FABRIC_GITHUB_TOKEN }}@${{ vars.CLI_REPO_URL || 'github.com/BralaBee-LEIT/usf_fabric_cli_cicd_codebase' }}.git@${{ vars.CLI_REPO_REF || 'v1.7.14' }}"
+          pip install "git+https://${{ secrets.FABRIC_GITHUB_TOKEN }}@${{ vars.CLI_REPO_URL || 'github.com/BralaBee-LEIT/usf_fabric_cli_cicd_codebase' }}.git@${{ vars.CLI_REPO_REF || 'v1.7.16' }}"
 
       - name: Verify credentials
         run: |
-          for var in AZURE_TENANT_ID AZURE_CLIENT_ID AZURE_CLIENT_SECRET FABRIC_CAPACITY_ID GITHUB_TOKEN_FABRIC DEV_ADMIN_OBJECT_ID; do
+          for var in AZURE_TENANT_ID AZURE_CLIENT_ID AZURE_CLIENT_SECRET FABRIC_CAPACITY_ID FABRIC_CAPACITY_ID_TEST FABRIC_CAPACITY_ID_PROD GITHUB_TOKEN_FABRIC DEV_ADMIN_OBJECT_ID; do
             if [ -z "${!var}" ]; then
               echo "::error::Required secret $var is not configured"
               exit 1

@@ -42,3 +42,5 @@ principals:
     description: Workspace admin user/group for portal access
   # Note: The deploying Service Principal automatically has Admin access
   # to workspaces it creates. No need to add it explicitly.
+
+    type: Group
