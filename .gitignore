@@ -22,3 +22,4 @@ Thumbs.db
 *.jsonl
 logs/
 audit_logs/
+.claude/
