@@ -1,11 +1,8 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# Demo Project — Base Workspace Configuration (Dev / Test / Prod)
+# Standard Data Product — Base Workspace Template
 # ─────────────────────────────────────────────────────────────────────────────
 #
-# This config defines the MAIN Dev workspace that is the source of truth.
-# It is deployed once (initial setup) and stays connected to `main` branch.
-# Feature workspaces branch off of this. After features merge back to main,
-# the Fabric Deployment Pipeline promotes content: Dev → Test → Prod.
+# TEMPLATE — Copy this folder to config/projects/<your_project>/
 #
 # 8-folder convention (replaces Bronze/Silver/Gold):
 #   000 Orchestrate  — Pipelines, Dataflows, scheduling
@@ -23,21 +20,27 @@
 #   3. Feature merges to `main` → Dev workspace auto-syncs via Fabric Git Sync
 #   4. GitHub Actions calls `fabric-cicd promote` → Dev → Test → Prod
 #   5. `organize-folders` runs post-promotion to restore folder assignments
+#
+# Placeholders:
+#   CHANGE-ME         — Replace with your project display name
+#   /CHANGE-ME        — Replace with your project slug (git_directory)
+#   CHANGEME_ADMIN_ID — Replace with <PROJECT>_ADMIN_ID
+#   CHANGEME_MEMBERS_ID — Replace with <PROJECT>_MEMBERS_ID
 # ─────────────────────────────────────────────────────────────────────────────
 
 workspace:
-  name: ${PROJECT_PREFIX}-dev
-  display_name: ${PROJECT_PREFIX} - Development
-  description: Main development workspace — Git-synced to main branch
+  name: "CHANGE-ME [DEV]"
+  display_name: "CHANGE-ME [DEV]"
+  description: Standard data product workspace
   capacity_id: ${FABRIC_CAPACITY_ID}
   git_repo: ${GIT_REPO_URL}
   git_branch: main
-  git_directory: /demo
+  git_directory: /CHANGE-ME
 
 environments:
   dev:
     workspace:
-      name: ${PROJECT_PREFIX}-dev
+      name: "CHANGE-ME [DEV]"
       capacity_id: ${FABRIC_CAPACITY_ID}
 
 # ── 8-folder convention ─────────────────────────────────────────────────────
@@ -80,16 +83,14 @@ folder_rules:
 lakehouses:
   - name: lh_bronze
     folder: "200 Store"
-    description: Raw data ingestion landing zone
-
-# ── Notebooks ───────────────────────────────────────────────────────────────
-notebooks:
-  - name: demo_notebook
-    folder: "300 Prepare"
-    description: Sample notebook for demo purposes
+    description: Raw data landing zone
+  - name: lh_silver
+    folder: "200 Store"
+    description: Cleansed and conformed data
 
 # ── Access control ──────────────────────────────────────────────────────────
 # Governance principals (shared across all projects in this repo)
+# Project-specific principals (unique per project — set via GitHub Secrets)
 principals:
   - id: "${AZURE_CLIENT_ID}"
     type: ServicePrincipal
@@ -103,26 +104,25 @@ principals:
     type: Group
     role: Contributor
     description: Governance contributor group
-  # Project-specific principals
-  - id: "${DEMO_ADMIN_ID}"
+  - id: "${CHANGEME_ADMIN_ID}"
     type: Group
     role: Admin
-    description: Demo project admins
-  - id: "${DEMO_MEMBERS_ID}"
+    description: "Project admins — set via <PROJECT>_ADMIN_ID secret"
+  - id: "${CHANGEME_MEMBERS_ID}"
     type: Group
     role: Member
-    description: Demo project team members
+    description: "Project team members — set via <PROJECT>_MEMBERS_ID secret"
 
 # ── Deployment Pipeline — connects Dev → Test → Prod ────────────────────────
 deployment_pipeline:
-  pipeline_name: "${PROJECT_PREFIX}-pipeline"
+  pipeline_name: "CHANGE-ME - Pipeline"
   stages:
     development:
-      workspace_name: ${PROJECT_PREFIX}-dev
+      workspace_name: "CHANGE-ME [DEV]"
       capacity_id: ${FABRIC_CAPACITY_ID}
     test:
-      workspace_name: ${PROJECT_PREFIX}-test
+      workspace_name: "CHANGE-ME [TEST]"
       capacity_id: ${FABRIC_CAPACITY_ID_TEST:-FABRIC_CAPACITY_ID}
     production:
-      workspace_name: ${PROJECT_PREFIX}-prod
+      workspace_name: "CHANGE-ME [PROD]"
       capacity_id: ${FABRIC_CAPACITY_ID_PROD:-FABRIC_CAPACITY_ID}

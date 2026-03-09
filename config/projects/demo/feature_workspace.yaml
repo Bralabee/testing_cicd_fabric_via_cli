@@ -1,5 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# Sales Analytics — Feature Workspace Configuration
+# Demo Project — Feature Workspace Configuration
 # ─────────────────────────────────────────────────────────────────────────────
 #
 # Minimal feature workspace config for isolated development.
@@ -8,19 +8,19 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 workspace:
-  name: ${PROJECT_PREFIX}-sales
-  display_name: ${PROJECT_PREFIX} Sales Analytics
-  description: Feature workspace for sales analytics development
+  name: ${PROJECT_PREFIX}
+  display_name: ${PROJECT_PREFIX}
+  description: Feature workspace for demo project development
   capacity_id: ${FABRIC_CAPACITY_ID}
   domain: ${FABRIC_DOMAIN_NAME}
   git_repo: ${GIT_REPO_URL}
   git_branch: main
-  git_directory: /sales_analytics
+  git_directory: /demo
 
 environments:
   dev:
     workspace:
-      name: ${PROJECT_PREFIX}-sales
+      name: ${PROJECT_PREFIX}
       capacity_id: ${FABRIC_CAPACITY_ID}
 
 # ── 8-folder convention (must match base_workspace.yaml) ────────────────────
@@ -50,11 +50,11 @@ principals:
     role: Contributor
     description: Governance contributor group
   # Project-specific principals
-  - id: "${SALES_ANALYTICS_ADMIN_ID}"
+  - id: "${DEMO_ADMIN_ID}"
     type: Group
     role: Admin
-    description: Sales Analytics project admins
-  - id: "${SALES_ANALYTICS_MEMBERS_ID}"
+    description: Demo project admins
+  - id: "${DEMO_MEMBERS_ID}"
     type: Group
     role: Member
-    description: Sales Analytics project team members
+    description: Demo project team members

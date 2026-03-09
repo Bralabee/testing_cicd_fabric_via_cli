@@ -1,8 +1,19 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# Sales Analytics — Base Workspace Configuration (Example Second Project)
+# Sales Analytics — Base Workspace Configuration (Dev / Test / Prod)
+# ─────────────────────────────────────────────────────────────────────────────
 #
 # Copy this pattern when onboarding a new project into a multi-project
 # consumer repo. Each project gets its own folder under config/projects/.
+#
+# 8-folder convention (replaces Bronze/Silver/Gold):
+#   000 Orchestrate  — Pipelines, Dataflows, scheduling
+#   100 Ingest       — Eventstreams, real-time sources
+#   200 Store        — Lakehouses (Bronze + Silver layers)
+#   300 Prepare      — Notebooks, Spark jobs (transformation)
+#   400 Model        — Warehouses, Semantic Models
+#   500 Visualize    — Reports, Dashboards
+#   999 Libraries    — Shared Environments, libraries
+#   Archive          — Deprecated / retired items
 #
 # IMPORTANT: This project uses the SAME GitHub Secrets as the demo project.
 # If you need different Service Principals per project, use separate
@@ -16,7 +27,7 @@ workspace:
   capacity_id: ${FABRIC_CAPACITY_ID}
   git_repo: ${GIT_REPO_URL}
   git_branch: main
-  git_directory: /
+  git_directory: /sales_analytics
 
 environments:
   dev:
@@ -24,43 +35,88 @@ environments:
       name: ${PROJECT_PREFIX}-sales-dev
       capacity_id: ${FABRIC_CAPACITY_ID}
 
-# Folder structure
+# ── 8-folder convention ─────────────────────────────────────────────────────
 folders:
-  - Bronze
-  - Silver
-  - Gold
-  - Curated
+  - "000 Orchestrate"
+  - "100 Ingest"
+  - "200 Store"
+  - "300 Prepare"
+  - "400 Model"
+  - "500 Visualize"
+  - "999 Libraries"
+  - "Archive"
 
-# Lakehouse resources
+# ── Folder rules — maps Fabric item types to folders ────────────────────────
+folder_rules:
+  - type: DataPipeline
+    folder: "000 Orchestrate"
+  - type: DataflowGen2
+    folder: "000 Orchestrate"
+  - type: Eventstream
+    folder: "100 Ingest"
+  - type: Lakehouse
+    folder: "200 Store"
+  - type: Notebook
+    folder: "300 Prepare"
+  - type: SparkJobDefinition
+    folder: "300 Prepare"
+  - type: Warehouse
+    folder: "400 Model"
+  - type: SemanticModel
+    folder: "400 Model"
+  - type: Report
+    folder: "500 Visualize"
+  - type: Dashboard
+    folder: "500 Visualize"
+  - type: Environment
+    folder: "999 Libraries"
+
+# ── Lakehouse resources ─────────────────────────────────────────────────────
 lakehouses:
   - name: lh_sales_bronze
-    folder: Bronze
+    folder: "200 Store"
     description: Raw sales data ingestion
 
   - name: lh_sales_gold
-    folder: Gold
+    folder: "400 Model"
     description: Curated sales aggregations
 
-# Notebooks
+# ── Notebooks ───────────────────────────────────────────────────────────────
 notebooks:
   - name: sales_ingestion
-    folder: Bronze
+    folder: "100 Ingest"
     description: Ingest sales data from source systems
 
   - name: sales_transform
-    folder: Silver
+    folder: "300 Prepare"
     description: Clean and transform sales data
 
-# Access control
+# ── Access control ──────────────────────────────────────────────────────────
+# Governance principals (shared across all projects in this repo)
 principals:
-  - id: ${DEV_ADMIN_OBJECT_ID}
+  - id: "${AZURE_CLIENT_ID}"
+    type: ServicePrincipal
     role: Admin
-    description: Workspace admin for portal access
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Deployment Pipeline — connects Dev → Test → Prod
-# ─────────────────────────────────────────────────────────────────────────────
+    description: Automation Service Principal
+  - id: "${ADDITIONAL_ADMIN_PRINCIPAL_ID}"
     type: Group
+    role: Admin
+    description: IT governance admin group
+  - id: "${ADDITIONAL_CONTRIBUTOR_PRINCIPAL_ID}"
+    type: Group
+    role: Contributor
+    description: Governance contributor group
+  # Project-specific principals
+  - id: "${SALES_ANALYTICS_ADMIN_ID}"
+    type: Group
+    role: Admin
+    description: Sales Analytics project admins
+  - id: "${SALES_ANALYTICS_MEMBERS_ID}"
+    type: Group
+    role: Member
+    description: Sales Analytics project team members
+
+# ── Deployment Pipeline — connects Dev → Test → Prod ────────────────────────
 deployment_pipeline:
   pipeline_name: "${PROJECT_PREFIX}-sales-pipeline"
   stages:

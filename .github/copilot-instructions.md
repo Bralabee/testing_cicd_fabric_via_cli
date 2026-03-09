@@ -150,5 +150,8 @@ chore: update CLI version reference
 - No secrets or hardcoded values committed
 - Tested with real feature workspace lifecycle (if workflow changes)
 
+### Docs Freshness Audit (every commit)
+Before final commit, verify all docs reflect true state: CLI version refs match `CLI_REPO_REF`, workflow counts match `ls .github/workflows/*.yml | wc -l`, file listings match actual directories. Grep for old version strings and archived tool references.
+
 ### Dependency Management
 - **Dependabot** monitors GitHub Actions dependencies weekly
