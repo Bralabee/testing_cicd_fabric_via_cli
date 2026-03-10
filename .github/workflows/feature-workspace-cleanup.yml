@@ -1,8 +1,11 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # Feature Workspace Cleanup — GitHub Actions Workflow
 #
-# Triggered when a PR to main is merged (and the feature branch is deleted).
-# Destroys the corresponding isolated Fabric workspace to free capacity.
+# Triggered when a PR to main is closed (merged) and the feature branch is
+# deleted. Destroys the corresponding isolated Fabric workspace to free capacity.
+#
+# Also supports manual trigger for orphaned workspace cleanup with an optional
+# workspace name override.
 #
 # SAFETY: By default, uses --safe mode — workspaces containing Fabric items
 # are protected from accidental deletion. Use force_destroy_populated input
@@ -12,17 +15,22 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 name: Cleanup Feature Workspace
+run-name: "Cleanup WS — ${{ inputs.workspace_name_override || inputs.branch_name || github.event.pull_request.head.ref || 'auto' }}"
 
 on:
   pull_request:
     types: [closed]
     branches: [main]
-  # Allow manual cleanup for orphaned workspaces
+
   workflow_dispatch:
     inputs:
       branch_name:
-        description: 'Feature branch name (e.g., feature/my-feature)'
+        description: 'Feature branch name (e.g., feature/demo/my-feature)'
         required: true
+        type: string
+      workspace_name_override:
+        description: 'Override workspace name (skip config lookup, destroy this workspace directly)'
+        required: false
         type: string
       force_destroy_populated:
         description: 'Force delete even if workspace contains Fabric items (DANGEROUS)'
@@ -30,41 +38,56 @@ on:
         type: boolean
         default: false
 
-# Prevent parallel cleanup of the same workspace
 concurrency:
   group: cleanup-${{ github.event.pull_request.head.ref || inputs.branch_name || 'manual' }}
   cancel-in-progress: false
 
 jobs:
   cleanup-feature-workspace:
-    # Only run when a feature branch PR is merged, or manual trigger
     if: >
       (github.event_name == 'pull_request' && github.event.pull_request.merged == true &&
        startsWith(github.event.pull_request.head.ref, 'feature/')) ||
       github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
 
     env:
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
       SP_OBJECT_ID: ${{ secrets.SP_OBJECT_ID }}
+      FABRIC_CAPACITY_ID: ${{ secrets.FABRIC_CAPACITY_ID }}
+      FABRIC_CAPACITY_ID_TEST: ${{ secrets.FABRIC_CAPACITY_ID_TEST }}
+      FABRIC_CAPACITY_ID_PROD: ${{ secrets.FABRIC_CAPACITY_ID_PROD }}
       PROJECT_PREFIX: ${{ vars.PROJECT_PREFIX || 'fabric-cicd-demo' }}
+      # Governance principals
+      ADDITIONAL_ADMIN_PRINCIPAL_ID: ${{ secrets.ADDITIONAL_ADMIN_PRINCIPAL_ID }}
+      ADDITIONAL_CONTRIBUTOR_PRINCIPAL_ID: ${{ secrets.ADDITIONAL_CONTRIBUTOR_PRINCIPAL_ID }}
+      # Project-specific principals
+      DEMO_ADMIN_ID: ${{ secrets.DEMO_ADMIN_ID }}
+      DEMO_MEMBERS_ID: ${{ secrets.DEMO_MEMBERS_ID }}
+      SALES_ANALYTICS_ADMIN_ID: ${{ secrets.SALES_ANALYTICS_ADMIN_ID }}
+      SALES_ANALYTICS_MEMBERS_ID: ${{ secrets.SALES_ANALYTICS_MEMBERS_ID }}
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
       - name: Setup Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
         with:
           python-version: '3.11'
 
       - name: Install CLI tool
+        env:
+          GIT_AUTH_TOKEN: ${{ secrets.FABRIC_GITHUB_TOKEN }}
         run: |
           pip install --upgrade pip
+          pip install pyyaml
           pip install ms-fabric-cli==${{ vars.FABRIC_CLI_VERSION || '1.3.1' }}
-          pip install "git+https://${{ secrets.FABRIC_GITHUB_TOKEN }}@${{ vars.CLI_REPO_URL || 'github.com/BralaBee-LEIT/usf_fabric_cli_cicd_codebase' }}.git@${{ vars.CLI_REPO_REF || 'v1.8.0' }}"
+          pip install "git+https://${GIT_AUTH_TOKEN}@${{ vars.CLI_REPO_URL || 'github.com/BralaBee-LEIT/usf_fabric_cli_cicd_codebase' }}.git@${{ vars.CLI_REPO_REF || 'v1.8.0' }}"
 
       - name: Extract branch info
         id: branch
@@ -74,11 +97,19 @@ jobs:
           else
             BRANCH_NAME="${{ inputs.branch_name }}"
           fi
+
           FEATURE_NAME="${BRANCH_NAME#feature/}"
+          # Parse project from branch: feature/<project>/<description>
+          PROJECT=$(echo "$BRANCH_NAME" | cut -d'/' -f2)
           WORKSPACE_SUFFIX=$(echo "$FEATURE_NAME" | sed 's/[^a-zA-Z0-9_-]/_/g')
+
           echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
           echo "feature_name=$FEATURE_NAME" >> $GITHUB_OUTPUT
+          echo "project=$PROJECT" >> $GITHUB_OUTPUT
           echo "workspace_suffix=$WORKSPACE_SUFFIX" >> $GITHUB_OUTPUT
+
+          echo "Branch: $BRANCH_NAME"
+          echo "Project: $PROJECT"
 
       - name: Verify credentials
         run: |
@@ -88,71 +119,88 @@ jobs:
               exit 1
             fi
           done
-          echo "✅ Credentials verified"
+          echo "Credentials verified"
 
       - name: Destroy feature workspace
-        env:
-          CONFIG_OVERRIDE: ${{ vars.FEATURE_WORKSPACE_CONFIG || '' }}
         run: |
-          # Priority: repo variable > naming convention search
-          if [ -n "$CONFIG_OVERRIDE" ]; then
-            CONFIG_FILE="$CONFIG_OVERRIDE"
-          else
-            CONFIG_FILE=$(find config/projects -name "feature_*.yaml" -type f | head -1)
-          fi
-
-          if [ -z "$CONFIG_FILE" ] || [ ! -f "$CONFIG_FILE" ]; then
-            echo "::error::Feature workspace config not found. Either set the FEATURE_WORKSPACE_CONFIG repo variable or add a feature_*.yaml file under config/projects/."
-            exit 1
-          fi
-
+          PROJECT="${{ steps.branch.outputs.project }}"
           BRANCH="${{ steps.branch.outputs.branch_name }}"
+
+          # Workspace name override takes priority
+          if [ -n "${{ inputs.workspace_name_override }}" ]; then
+            echo "Using workspace name override: ${{ inputs.workspace_name_override }}"
+            DESTROY_ARGS="--workspace-name ${{ inputs.workspace_name_override }}"
+          else
+            # Look up config from project slug
+            CONFIG_FILE="config/projects/${PROJECT}/base_workspace.yaml"
+
+            if [ ! -f "$CONFIG_FILE" ]; then
+              # Fallback: try feature-specific config
+              CONFIG_FILE=$(find "config/projects/${PROJECT}" -name "feature_*.yaml" -type f 2>/dev/null | head -1)
+            fi
+
+            if [ -z "$CONFIG_FILE" ] || [ ! -f "$CONFIG_FILE" ]; then
+              echo "::error::No config found for project '${PROJECT}'. Expected: config/projects/${PROJECT}/base_workspace.yaml"
+              echo "::notice::Use workspace_name_override input for manual cleanup"
+              exit 1
+            fi
+
+            DESTROY_ARGS="$CONFIG_FILE --branch $BRANCH"
+          fi
 
           # Safety flags — protect populated workspaces by default
           SAFETY_FLAGS="--safe"
+          SAFETY_MODE="Safe"
           if [ "${{ inputs.force_destroy_populated }}" == "true" ]; then
             SAFETY_FLAGS="--force-destroy-populated"
-            echo "⚠️  FORCE mode: will delete workspace even if it contains Fabric items"
+            SAFETY_MODE="Force"
+            echo "WARNING: FORCE mode — will delete workspace even if it contains Fabric items"
           else
-            echo "🛡️  SAFE mode: workspace with Fabric items will be protected"
+            echo "SAFE mode — workspace with Fabric items will be protected"
           fi
 
-          echo "🧹 Destroying feature workspace for branch: $BRANCH"
+          echo "Destroying feature workspace"
+          echo "  Project: $PROJECT"
+          echo "  Branch: $BRANCH"
+          echo "  Safety: $SAFETY_MODE"
 
-          # Use CLI's --branch flag to derive workspace name identically to deploy
-          # CLI handles: not-found (idempotent), InsufficientPrivileges (warning)
           DESTROY_EXIT=0
           fabric-cicd destroy \
-            "$CONFIG_FILE" \
+            $DESTROY_ARGS \
             --force \
-            $SAFETY_FLAGS \
-            --branch "$BRANCH" || DESTROY_EXIT=$?
+            $SAFETY_FLAGS || DESTROY_EXIT=$?
 
-          # Exit code 2 = safety block (workspace has items, not deleted)
           if [ $DESTROY_EXIT -eq 2 ]; then
-            echo "::warning::🛡️ Workspace protected — contains Fabric items. Use force_destroy_populated=true to override."
+            echo "::warning::Workspace protected — contains Fabric items. Use force_destroy_populated=true to override."
             echo "SAFETY_BLOCKED=true" >> $GITHUB_ENV
+            echo "SAFETY_MODE=$SAFETY_MODE" >> $GITHUB_ENV
           elif [ $DESTROY_EXIT -ne 0 ]; then
             echo "::error::Destroy failed with exit code $DESTROY_EXIT"
             exit $DESTROY_EXIT
           fi
 
+          echo "SAFETY_MODE=$SAFETY_MODE" >> $GITHUB_ENV
+
       - name: Report cleanup
         if: always()
         run: |
           if [ "$SAFETY_BLOCKED" == "true" ]; then
-            echo "## 🛡️ Feature Workspace Protected" >> $GITHUB_STEP_SUMMARY
+            echo "## Feature Workspace Protected" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "> **Workspace contains Fabric items and was NOT deleted.**" >> $GITHUB_STEP_SUMMARY
             echo "> Re-run with \`force_destroy_populated: true\` to override." >> $GITHUB_STEP_SUMMARY
           else
-            echo "## 🧹 Feature Workspace Cleaned Up" >> $GITHUB_STEP_SUMMARY
+            echo "## Feature Workspace Cleaned Up" >> $GITHUB_STEP_SUMMARY
           fi
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|:---|:---|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Project** | \`${{ steps.branch.outputs.project }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **Branch** | \`${{ steps.branch.outputs.branch_name }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **Feature** | \`${{ steps.branch.outputs.feature_name }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **Triggered by** | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
           echo "| **Event** | ${{ github.event_name }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Safety Mode** | ${{ inputs.force_destroy_populated == 'true' && '⚠️ Force' || '🛡️ Safe' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Safety Mode** | ${SAFETY_MODE:-Safe} |" >> $GITHUB_STEP_SUMMARY
+          if [ -n "${{ inputs.workspace_name_override }}" ]; then
+            echo "| **WS Override** | \`${{ inputs.workspace_name_override }}\` |" >> $GITHUB_STEP_SUMMARY
+          fi

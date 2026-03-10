@@ -1,26 +1,36 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # Feature Workspace Creation — GitHub Actions Workflow
 #
-# Triggered when a feature/* branch is pushed. Creates an isolated Fabric
-# workspace connected to the feature branch, following Microsoft's Scenario 2
-# (develop in a separate workspace) from the official Git integration docs.
+# Triggered when a feature/** branch is pushed, or manually via workflow_dispatch
+# with a project dropdown. Creates an isolated Fabric workspace connected to the
+# feature branch, following Microsoft's Scenario 2 (develop in a separate workspace).
+#
+# Branch naming convention: feature/<project>/<description>
+#   e.g., feature/demo/add-gold-table, feature/sales_analytics/new-report
 #
 # Ref: https://learn.microsoft.com/en-us/fabric/cicd/git-integration/manage-branches
 # ─────────────────────────────────────────────────────────────────────────────
 
 name: Create Feature Workspace
-run-name: "Feature WS Create — ${{ github.event_name == 'workflow_dispatch' && format('feature/{0}', inputs.feature_name) || github.ref_name }}"
+run-name: "Feature WS Create — ${{ github.event_name == 'workflow_dispatch' && format('{0}/{1}', inputs.project, inputs.feature_name) || github.ref_name }}"
 
 on:
   push:
     branches:
       - 'feature/**'
 
-  # Manual trigger — allows creating feature workspaces from the GitHub UI
   workflow_dispatch:
     inputs:
+      project:
+        description: 'Project for feature workspace'
+        required: true
+        type: choice
+        options:
+          - demo
+          - sales_analytics
+          # ➕ Add new projects here
       feature_name:
-        description: 'Feature name (e.g., add-gold-table). Will create branch feature/<name>'
+        description: 'Feature name (e.g., add-gold-table). Branch: feature/<project>/<name>'
         required: true
         type: string
       create_branch:
@@ -29,9 +39,8 @@ on:
         type: boolean
         default: true
 
-# Only allow one workspace creation at a time per branch
 concurrency:
-  group: feature-ws-${{ github.event_name == 'workflow_dispatch' && format('feature/{0}', inputs.feature_name) || github.ref_name }}
+  group: feature-ws-${{ github.event_name == 'workflow_dispatch' && format('feature/{0}/{1}', inputs.project, inputs.feature_name) || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
@@ -49,53 +58,72 @@ jobs:
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
       SP_OBJECT_ID: ${{ secrets.SP_OBJECT_ID }}
-      GITHUB_TOKEN_FABRIC: ${{ secrets.FABRIC_GITHUB_TOKEN }}
-      GITHUB_TOKEN: ${{ secrets.FABRIC_GITHUB_TOKEN }}
       FABRIC_CAPACITY_ID: ${{ secrets.FABRIC_CAPACITY_ID }}
       FABRIC_CAPACITY_ID_TEST: ${{ secrets.FABRIC_CAPACITY_ID_TEST }}
       FABRIC_CAPACITY_ID_PROD: ${{ secrets.FABRIC_CAPACITY_ID_PROD }}
-      DEV_ADMIN_OBJECT_ID: ${{ secrets.DEV_ADMIN_OBJECT_ID }}
-      GIT_REPO_URL: ${{ github.server_url }}/${{ github.repository }}
       PROJECT_PREFIX: ${{ vars.PROJECT_PREFIX || 'fabric-cicd-demo' }}
+      GITHUB_TOKEN_FABRIC: ${{ secrets.FABRIC_GITHUB_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.FABRIC_GITHUB_TOKEN }}
+      GIT_REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+      # Governance principals
+      ADDITIONAL_ADMIN_PRINCIPAL_ID: ${{ secrets.ADDITIONAL_ADMIN_PRINCIPAL_ID }}
+      ADDITIONAL_CONTRIBUTOR_PRINCIPAL_ID: ${{ secrets.ADDITIONAL_CONTRIBUTOR_PRINCIPAL_ID }}
+      # Project-specific principals
+      DEMO_ADMIN_ID: ${{ secrets.DEMO_ADMIN_ID }}
+      DEMO_MEMBERS_ID: ${{ secrets.DEMO_MEMBERS_ID }}
+      SALES_ANALYTICS_ADMIN_ID: ${{ secrets.SALES_ANALYTICS_ADMIN_ID }}
+      SALES_ANALYTICS_MEMBERS_ID: ${{ secrets.SALES_ANALYTICS_MEMBERS_ID }}
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           ref: ${{ github.ref }}
 
       - name: Setup Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
         with:
           python-version: '3.11'
 
       - name: Install CLI tool
+        env:
+          GIT_AUTH_TOKEN: ${{ secrets.FABRIC_GITHUB_TOKEN }}
         run: |
           pip install --upgrade pip
+          pip install pyyaml
           pip install ms-fabric-cli==${{ vars.FABRIC_CLI_VERSION || '1.3.1' }}
-          pip install "git+https://${{ secrets.FABRIC_GITHUB_TOKEN }}@${{ vars.CLI_REPO_URL || 'github.com/BralaBee-LEIT/usf_fabric_cli_cicd_codebase' }}.git@${{ vars.CLI_REPO_REF || 'v1.8.0' }}"
+          pip install "git+https://${GIT_AUTH_TOKEN}@${{ vars.CLI_REPO_URL || 'github.com/BralaBee-LEIT/usf_fabric_cli_cicd_codebase' }}.git@${{ vars.CLI_REPO_REF || 'v1.8.0' }}"
 
       - name: Extract branch info
         id: branch
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            BRANCH_NAME="feature/${{ inputs.feature_name }}"
+            BRANCH_NAME="feature/${{ inputs.project }}/${{ inputs.feature_name }}"
+            PROJECT="${{ inputs.project }}"
           else
             BRANCH_NAME="${{ github.ref_name }}"
+            # Parse project from branch: feature/<project>/<description>
+            PROJECT=$(echo "$BRANCH_NAME" | cut -d'/' -f2)
           fi
+
           FEATURE_NAME="${BRANCH_NAME#feature/}"
           # Sanitise for Fabric workspace naming (alphanumeric, hyphens, underscores)
           WORKSPACE_SUFFIX=$(echo "$FEATURE_NAME" | sed 's/[^a-zA-Z0-9_-]/_/g')
+
           echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
           echo "feature_name=$FEATURE_NAME" >> $GITHUB_OUTPUT
           echo "workspace_suffix=$WORKSPACE_SUFFIX" >> $GITHUB_OUTPUT
-          echo "📌 Branch: $BRANCH_NAME"
+          echo "project=$PROJECT" >> $GITHUB_OUTPUT
+
+          echo "Branch: $BRANCH_NAME"
+          echo "Project: $PROJECT"
+          echo "Feature: $FEATURE_NAME"
 
       - name: Create feature branch (manual trigger only)
         if: github.event_name == 'workflow_dispatch' && inputs.create_branch
         run: |
           BRANCH="${{ steps.branch.outputs.branch_name }}"
-          echo "🌿 Creating branch: $BRANCH"
+          echo "Creating branch: $BRANCH"
           if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
             echo "Branch $BRANCH already exists — skipping creation"
           else
@@ -103,51 +131,59 @@ jobs:
             git config user.email "github-actions[bot]@users.noreply.github.com"
             git checkout -b "$BRANCH"
             git push origin "$BRANCH"
-            echo "✅ Branch $BRANCH created from main"
+            echo "Branch $BRANCH created from main"
           fi
 
       - name: Verify credentials
         run: |
-          for var in AZURE_TENANT_ID AZURE_CLIENT_ID AZURE_CLIENT_SECRET FABRIC_CAPACITY_ID FABRIC_CAPACITY_ID_TEST FABRIC_CAPACITY_ID_PROD; do
+          for var in AZURE_TENANT_ID AZURE_CLIENT_ID AZURE_CLIENT_SECRET FABRIC_CAPACITY_ID; do
             if [ -z "${!var}" ]; then
               echo "::error::Required secret $var is not configured"
               exit 1
             fi
           done
-          echo "✅ All required credentials verified"
+          # Verify governance principals (warn if missing)
+          for var in ADDITIONAL_ADMIN_PRINCIPAL_ID ADDITIONAL_CONTRIBUTOR_PRINCIPAL_ID; do
+            if [ -z "${!var}" ]; then
+              echo "::warning::Governance principal $var is not configured"
+            fi
+          done
+          echo "All required credentials verified"
 
       - name: Deploy feature workspace
-        env:
-          CONFIG_OVERRIDE: ${{ vars.FEATURE_WORKSPACE_CONFIG || '' }}
         run: |
-          # Priority: repo variable > naming convention search
-          if [ -n "$CONFIG_OVERRIDE" ]; then
-            CONFIG_FILE="$CONFIG_OVERRIDE"
-          else
-            CONFIG_FILE=$(find config/projects -name "feature_*.yaml" -type f | head -1)
+          PROJECT="${{ steps.branch.outputs.project }}"
+          BRANCH="${{ steps.branch.outputs.branch_name }}"
+          CONFIG_FILE="config/projects/${PROJECT}/base_workspace.yaml"
+
+          if [ ! -f "$CONFIG_FILE" ]; then
+            # Fallback: try feature-specific config
+            CONFIG_FILE=$(find "config/projects/${PROJECT}" -name "feature_*.yaml" -type f 2>/dev/null | head -1)
           fi
 
           if [ -z "$CONFIG_FILE" ] || [ ! -f "$CONFIG_FILE" ]; then
-            echo "::error::Feature workspace config not found. Either set the FEATURE_WORKSPACE_CONFIG repo variable or add a feature_*.yaml file under config/projects/."
+            echo "::error::No config found for project '${PROJECT}'. Expected: config/projects/${PROJECT}/base_workspace.yaml"
             exit 1
           fi
 
-          echo "📦 Creating feature workspace for branch: ${{ steps.branch.outputs.branch_name }}"
-          echo "📋 Using config: $CONFIG_FILE"
+          echo "Creating feature workspace for branch: $BRANCH"
+          echo "  Project: $PROJECT"
+          echo "  Config: $CONFIG_FILE"
 
           fabric-cicd deploy \
             "$CONFIG_FILE" \
             --env dev \
-            --branch "${{ steps.branch.outputs.branch_name }}" \
+            --branch "$BRANCH" \
             --force-branch-workspace
 
       - name: Report workspace creation
         if: success()
         run: |
-          echo "## ✅ Feature Workspace Created" >> $GITHUB_STEP_SUMMARY
+          echo "## Feature Workspace Created" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|:---|:---|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Project** | \`${{ steps.branch.outputs.project }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **Branch** | \`${{ steps.branch.outputs.branch_name }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **Feature** | \`${{ steps.branch.outputs.feature_name }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **Commit** | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
@@ -156,7 +192,10 @@ jobs:
       - name: Report failure
         if: failure()
         run: |
-          echo "## ❌ Feature Workspace Creation Failed" >> $GITHUB_STEP_SUMMARY
+          echo "## Feature Workspace Creation Failed" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Branch: \`${{ steps.branch.outputs.branch_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|:---|:---|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Project** | \`${{ steps.branch.outputs.project }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Branch** | \`${{ steps.branch.outputs.branch_name }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "Check the logs above for details." >> $GITHUB_STEP_SUMMARY

@@ -1,23 +1,33 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # Initial Environment Setup — GitHub Actions Workflow
 #
-# Run ONCE (manually) to provision the base Dev/Test/Prod workspaces and
-# connect them to a Fabric Deployment Pipeline. This is the STARTING POINT
+# Run ONCE per project (manually) to provision the base Dev/Test/Prod workspaces
+# and connect them to a Fabric Deployment Pipeline. This is the STARTING POINT
 # before any feature branch work begins.
 #
 # After this workflow runs successfully:
 #   - Dev workspace exists and is Git-synced to `main`
 #   - Test and Prod workspaces exist (content promoted via Deployment Pipeline)
 #   - Feature branches can now create isolated workspaces
+#   - Run organize-folders if the project uses folder_rules
 #
-# Usage: Actions → "Setup Base Workspaces" → Run workflow
+# Usage: Actions -> "Setup Base Workspaces" -> Select project -> Run workflow
 # ─────────────────────────────────────────────────────────────────────────────
 
 name: Setup Base Workspaces
+run-name: "Setup Base Workspace — ${{ inputs.project }}"
 
 on:
   workflow_dispatch:
     inputs:
+      project:
+        description: 'Project to set up'
+        required: true
+        type: choice
+        options:
+          - demo
+          - sales_analytics
+          # ➕ Add new projects here
       environment:
         description: 'Environment to deploy (dev deploys the main Dev workspace)'
         required: true
@@ -28,79 +38,159 @@ on:
 
 jobs:
   setup-base-workspaces:
-    name: Deploy Base Dev Workspace
+    name: "Deploy Base Workspace — ${{ inputs.project }}"
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
 
     env:
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
       SP_OBJECT_ID: ${{ secrets.SP_OBJECT_ID }}
-      GITHUB_TOKEN_FABRIC: ${{ secrets.FABRIC_GITHUB_TOKEN }}
-      GITHUB_TOKEN: ${{ secrets.FABRIC_GITHUB_TOKEN }}
       FABRIC_CAPACITY_ID: ${{ secrets.FABRIC_CAPACITY_ID }}
       FABRIC_CAPACITY_ID_TEST: ${{ secrets.FABRIC_CAPACITY_ID_TEST }}
       FABRIC_CAPACITY_ID_PROD: ${{ secrets.FABRIC_CAPACITY_ID_PROD }}
-      DEV_ADMIN_OBJECT_ID: ${{ secrets.DEV_ADMIN_OBJECT_ID }}
-      GIT_REPO_URL: ${{ github.server_url }}/${{ github.repository }}
       PROJECT_PREFIX: ${{ vars.PROJECT_PREFIX || 'fabric-cicd-demo' }}
+      GITHUB_TOKEN_FABRIC: ${{ secrets.FABRIC_GITHUB_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.FABRIC_GITHUB_TOKEN }}
+      GIT_REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+      # Governance principals
+      ADDITIONAL_ADMIN_PRINCIPAL_ID: ${{ secrets.ADDITIONAL_ADMIN_PRINCIPAL_ID }}
+      ADDITIONAL_CONTRIBUTOR_PRINCIPAL_ID: ${{ secrets.ADDITIONAL_CONTRIBUTOR_PRINCIPAL_ID }}
+      # Project-specific principals
+      DEMO_ADMIN_ID: ${{ secrets.DEMO_ADMIN_ID }}
+      DEMO_MEMBERS_ID: ${{ secrets.DEMO_MEMBERS_ID }}
+      SALES_ANALYTICS_ADMIN_ID: ${{ secrets.SALES_ANALYTICS_ADMIN_ID }}
+      SALES_ANALYTICS_MEMBERS_ID: ${{ secrets.SALES_ANALYTICS_MEMBERS_ID }}
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
       - name: Setup Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
         with:
           python-version: '3.11'
 
       - name: Install CLI tool
+        env:
+          GIT_AUTH_TOKEN: ${{ secrets.FABRIC_GITHUB_TOKEN }}
         run: |
           pip install --upgrade pip
+          pip install pyyaml
           pip install ms-fabric-cli==${{ vars.FABRIC_CLI_VERSION || '1.3.1' }}
-          pip install "git+https://${{ secrets.FABRIC_GITHUB_TOKEN }}@${{ vars.CLI_REPO_URL || 'github.com/BralaBee-LEIT/usf_fabric_cli_cicd_codebase' }}.git@${{ vars.CLI_REPO_REF || 'v1.8.0' }}"
+          pip install "git+https://${GIT_AUTH_TOKEN}@${{ vars.CLI_REPO_URL || 'github.com/BralaBee-LEIT/usf_fabric_cli_cicd_codebase' }}.git@${{ vars.CLI_REPO_REF || 'v1.8.0' }}"
 
       - name: Verify credentials
         run: |
-          for var in AZURE_TENANT_ID AZURE_CLIENT_ID AZURE_CLIENT_SECRET FABRIC_CAPACITY_ID FABRIC_CAPACITY_ID_TEST FABRIC_CAPACITY_ID_PROD GITHUB_TOKEN_FABRIC DEV_ADMIN_OBJECT_ID; do
+          for var in AZURE_TENANT_ID AZURE_CLIENT_ID AZURE_CLIENT_SECRET GITHUB_TOKEN_FABRIC; do
             if [ -z "${!var}" ]; then
               echo "::error::Required secret $var is not configured"
               exit 1
             fi
           done
-          echo "All required credentials verified"
+          # Check capacity IDs (with fallback awareness)
+          for var in FABRIC_CAPACITY_ID FABRIC_CAPACITY_ID_TEST FABRIC_CAPACITY_ID_PROD; do
+            if [ -z "${!var}" ]; then
+              echo "::warning::$var is not configured — will use FABRIC_CAPACITY_ID as fallback if needed"
+            fi
+          done
+          # Verify governance principals
+          for var in ADDITIONAL_ADMIN_PRINCIPAL_ID ADDITIONAL_CONTRIBUTOR_PRINCIPAL_ID; do
+            if [ -z "${!var}" ]; then
+              echo "::warning::Governance principal $var is not configured"
+            fi
+          done
+          echo "Credentials verified"
 
-      - name: Deploy Dev workspace
+      - name: Verify project git directory
         run: |
-          echo "📦 Deploying base Dev workspace..."
+          PROJECT="${{ inputs.project }}"
+          CONFIG_FILE="config/projects/${PROJECT}/base_workspace.yaml"
+
+          if [ ! -f "$CONFIG_FILE" ]; then
+            echo "::error::Config not found: $CONFIG_FILE"
+            exit 1
+          fi
+
+          # Extract git_directory from config
+          GIT_DIR=$(python3 -c "
+          import yaml
+          config = yaml.safe_load(open('$CONFIG_FILE'))
+          gd = config.get('git_integration', {}).get('git_directory', '')
+          print(gd)
+          " 2>/dev/null)
+
+          if [ -n "$GIT_DIR" ]; then
+            CHECK_DIR="${GIT_DIR#/}"
+            if [ ! -d "$CHECK_DIR" ]; then
+              echo "Creating git directory: $CHECK_DIR"
+              mkdir -p "$CHECK_DIR"
+              touch "$CHECK_DIR/.gitkeep"
+              echo "Created $CHECK_DIR with .gitkeep placeholder"
+            else
+              echo "Git directory exists: $CHECK_DIR"
+            fi
+          else
+            echo "No git_directory configured — Fabric will use repo root"
+          fi
+
+      - name: Deploy base workspace
+        run: |
+          PROJECT="${{ inputs.project }}"
+          CONFIG_FILE="config/projects/${PROJECT}/base_workspace.yaml"
+
+          echo "Deploying base workspace for project: $PROJECT"
+          echo "  Config: $CONFIG_FILE"
+          echo "  Environment: ${{ inputs.environment }}"
+
           fabric-cicd deploy \
-            config/projects/demo/base_workspace.yaml \
+            "$CONFIG_FILE" \
             --env ${{ inputs.environment }} \
             --rollback-on-failure
 
       - name: Report setup complete
         if: success()
         run: |
-          echo "## ✅ Base Workspace Setup Complete" >> $GITHUB_STEP_SUMMARY
+          PROJECT="${{ inputs.project }}"
+          CONFIG_FILE="config/projects/${PROJECT}/base_workspace.yaml"
+
+          # Check if project has git_directory
+          GIT_DIR=$(python3 -c "
+          import yaml
+          config = yaml.safe_load(open('$CONFIG_FILE'))
+          print(config.get('git_integration', {}).get('git_directory', 'repo root'))
+          " 2>/dev/null || echo "unknown")
+
+          echo "## Base Workspace Setup Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|:---|:---|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Project** | \`$PROJECT\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **Environment** | \`${{ inputs.environment }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Config** | \`config/projects/demo/base_workspace.yaml\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Config** | \`config/projects/${PROJECT}/base_workspace.yaml\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Git Directory** | \`$GIT_DIR\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **Triggered by** | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### What was deployed" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Dev workspace created and Git-synced to \`main\`" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Deployment Pipeline created (configured in base_workspace.yaml)" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Test and Prod workspaces created and assigned to pipeline" >> $GITHUB_STEP_SUMMARY
+          echo "- Dev workspace created and Git-synced to \`main\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Deployment Pipeline created (configured in base_workspace.yaml)" >> $GITHUB_STEP_SUMMARY
+          echo "- Test and Prod workspaces created and assigned to pipeline" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
-          echo "1. Create a \`feature/*\` branch to test the feature workspace lifecycle" >> $GITHUB_STEP_SUMMARY
-          echo "2. Merge a PR to \`main\` to trigger automatic Dev → Test promotion" >> $GITHUB_STEP_SUMMARY
-          echo "3. Manually trigger **Promote Test → Prod** workflow when ready" >> $GITHUB_STEP_SUMMARY
+          echo "1. If the project uses \`folder_rules\`, run **Deploy to Dev** to organize folders" >> $GITHUB_STEP_SUMMARY
+          echo "2. Create a \`feature/${PROJECT}/<name>\` branch to test the feature workspace lifecycle" >> $GITHUB_STEP_SUMMARY
+          echo "3. Trigger **Promote Dev to Test** to promote content through the pipeline" >> $GITHUB_STEP_SUMMARY
+          echo "4. Manually trigger **Promote Test to Production** when ready" >> $GITHUB_STEP_SUMMARY
 
       - name: Report failure
         if: failure()
         run: |
-          echo "## ❌ Base Workspace Setup Failed" >> $GITHUB_STEP_SUMMARY
+          echo "## Base Workspace Setup Failed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|:---|:---|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Project** | \`${{ inputs.project }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "Check the logs above for details." >> $GITHUB_STEP_SUMMARY

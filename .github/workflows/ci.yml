@@ -1,8 +1,9 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# CI Pipeline — Configuration Validation
+# CI Pipeline — Configuration Validation & Folder Discovery
 #
-# Validates YAML configurations on every push/PR to catch errors
-# before they reach the deployment workflows.
+# Validates YAML configurations on every push/PR to catch errors before they
+# reach the deployment workflows. On PRs from feature/* branches, also runs
+# discover-folders to detect new folders in feature workspaces.
 # ─────────────────────────────────────────────────────────────────────────────
 
 name: CI
@@ -20,47 +21,214 @@ jobs:
   validate-config:
     name: Validate Configuration
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
       - name: Validate YAML syntax
         run: |
           echo "Validating YAML files..."
+          ERRORS=0
           for f in config/**/*.yaml config/**/*.yml; do
             if [ -f "$f" ]; then
               python3 -c "import yaml; yaml.safe_load(open('$f'))" 2>&1 || {
                 echo "::error::Invalid YAML syntax in $f"
-                exit 1
+                ERRORS=$((ERRORS + 1))
               }
-              echo "✅ $f"
-            fi
-          done
-
-      - name: Check required environment variable placeholders
-        run: |
-          echo "Checking env var substitution patterns..."
-          for f in config/**/*.yaml; do
-            if [ -f "$f" ]; then
-              # Verify config uses ${VAR} patterns, not hardcoded values
-              if grep -qP '(client_id|client_secret|tenant_id|capacity_id):\s*["\x27]?[a-f0-9-]{36}' "$f"; then
-                echo "::error::Hardcoded credential found in $f — use \${VAR_NAME} substitution"
-                exit 1
+              if [ $ERRORS -eq 0 ]; then
+                echo "  $f"
               fi
             fi
           done
-          echo "✅ No hardcoded credentials detected"
+          if [ $ERRORS -gt 0 ]; then
+            echo "::error::$ERRORS YAML file(s) have syntax errors"
+            exit 1
+          fi
+          echo "All YAML files validated successfully"
+
+      - name: Check for hardcoded credentials
+        run: |
+          echo "Checking for hardcoded credentials..."
+          ERRORS=0
+          for f in config/**/*.yaml; do
+            if [ -f "$f" ]; then
+              # Check for hardcoded GUIDs in credential fields
+              if grep -qP '(client_id|client_secret|tenant_id|capacity_id):\s*["\x27]?[a-f0-9-]{36}' "$f"; then
+                echo "::error::Hardcoded credential found in $f — use \${VAR_NAME} substitution"
+                ERRORS=$((ERRORS + 1))
+              fi
+            fi
+          done
+          if [ $ERRORS -gt 0 ]; then
+            exit 1
+          fi
+          echo "No hardcoded credentials detected"
 
       - name: Validate workflow files
         run: |
           echo "Checking workflow YAML syntax..."
+          ERRORS=0
           for f in .github/workflows/*.yml; do
             if [ -f "$f" ]; then
               python3 -c "import yaml; yaml.safe_load(open('$f'))" 2>&1 || {
                 echo "::error::Invalid YAML syntax in $f"
-                exit 1
+                ERRORS=$((ERRORS + 1))
               }
-              echo "✅ $f"
+              if [ $ERRORS -eq 0 ]; then
+                echo "  $f"
+              fi
             fi
           done
+          if [ $ERRORS -gt 0 ]; then
+            exit 1
+          fi
+          echo "All workflow files validated"
+
+      - name: Validate git_directory per project
+        run: |
+          echo "Validating git_directory settings..."
+          ERRORS=0
+          for project_dir in config/projects/*/; do
+            # Skip _templates directory
+            PROJECT=$(basename "$project_dir")
+            if [ "$PROJECT" = "_templates" ]; then
+              echo "  Skipping _templates/"
+              continue
+            fi
+
+            CONFIG_FILE="${project_dir}base_workspace.yaml"
+            if [ ! -f "$CONFIG_FILE" ]; then
+              continue
+            fi
+
+            GIT_DIR=$(python3 -c "
+          import yaml, sys
+          try:
+              config = yaml.safe_load(open('$CONFIG_FILE'))
+              gd = config.get('git_integration', {}).get('git_directory', '')
+              print(gd)
+          except Exception as e:
+              print('', file=sys.stderr)
+          " 2>/dev/null)
+
+            if [ -n "$GIT_DIR" ]; then
+              # Strip leading slash for filesystem check
+              CHECK_DIR="${GIT_DIR#/}"
+              if [ ! -d "$CHECK_DIR" ] && [ "$CHECK_DIR" != "" ]; then
+                echo "::warning::git_directory '$GIT_DIR' for project '$PROJECT' does not exist yet (will be created on first deploy)"
+              else
+                echo "  $PROJECT: git_directory '$GIT_DIR' OK"
+              fi
+            fi
+          done
+          if [ $ERRORS -gt 0 ]; then
+            exit 1
+          fi
+          echo "git_directory validation complete"
+
+  discover-folders:
+    name: Discover Folders
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Only run on PRs from feature/* branches
+    if: >
+      github.event_name == 'pull_request' &&
+      startsWith(github.event.pull_request.head.ref, 'feature/')
+    permissions:
+      contents: write
+      pull-requests: write
+
+    env:
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      SP_OBJECT_ID: ${{ secrets.SP_OBJECT_ID }}
+      FABRIC_CAPACITY_ID: ${{ secrets.FABRIC_CAPACITY_ID }}
+      PROJECT_PREFIX: ${{ vars.PROJECT_PREFIX || 'fabric-cicd-demo' }}
+      # Governance principals
+      ADDITIONAL_ADMIN_PRINCIPAL_ID: ${{ secrets.ADDITIONAL_ADMIN_PRINCIPAL_ID }}
+      ADDITIONAL_CONTRIBUTOR_PRINCIPAL_ID: ${{ secrets.ADDITIONAL_CONTRIBUTOR_PRINCIPAL_ID }}
+      # Project-specific principals
+      DEMO_ADMIN_ID: ${{ secrets.DEMO_ADMIN_ID }}
+      DEMO_MEMBERS_ID: ${{ secrets.DEMO_MEMBERS_ID }}
+      SALES_ANALYTICS_ADMIN_ID: ${{ secrets.SALES_ANALYTICS_ADMIN_ID }}
+      SALES_ANALYTICS_MEMBERS_ID: ${{ secrets.SALES_ANALYTICS_MEMBERS_ID }}
+
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+        with:
+          python-version: '3.11'
+
+      - name: Install CLI tool
+        env:
+          GIT_AUTH_TOKEN: ${{ secrets.FABRIC_GITHUB_TOKEN }}
+        run: |
+          pip install --upgrade pip
+          pip install pyyaml
+          pip install ms-fabric-cli==${{ vars.FABRIC_CLI_VERSION || '1.3.1' }}
+          pip install "git+https://${GIT_AUTH_TOKEN}@${{ vars.CLI_REPO_URL || 'github.com/BralaBee-LEIT/usf_fabric_cli_cicd_codebase' }}.git@${{ vars.CLI_REPO_REF || 'v1.8.0' }}"
+
+      - name: Determine affected project from branch
+        id: project
+        run: |
+          BRANCH="${{ github.event.pull_request.head.ref }}"
+          # Branch format: feature/<project>/<description>
+          PROJECT=$(echo "$BRANCH" | cut -d'/' -f2)
+
+          # Validate project has a config
+          if [ ! -f "config/projects/${PROJECT}/base_workspace.yaml" ]; then
+            echo "::warning::No config found for project '${PROJECT}' — skipping discover-folders"
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "project=${PROJECT}" >> $GITHUB_OUTPUT
+            echo "skip=false" >> $GITHUB_OUTPUT
+            echo "Detected project: ${PROJECT}"
+          fi
+
+      - name: Discover folders
+        if: steps.project.outputs.skip != 'true'
+        run: |
+          PROJECT="${{ steps.project.outputs.project }}"
+          CONFIG_FILE="config/projects/${PROJECT}/base_workspace.yaml"
+
+          echo "Discovering folders for project: ${PROJECT}"
+          echo "Config: ${CONFIG_FILE}"
+
+          fabric-cicd discover-folders \
+            "${CONFIG_FILE}" \
+            --env dev || {
+            EXIT_CODE=$?
+            if [ $EXIT_CODE -eq 2 ]; then
+              echo "No new folders discovered (exit code 2 = graceful skip)"
+            else
+              echo "::error::discover-folders failed with exit code $EXIT_CODE"
+              exit $EXIT_CODE
+            fi
+          }
+
+      - name: Auto-commit discovered folders
+        if: steps.project.outputs.skip != 'true'
+        run: |
+          # Check if discover-folders modified any files
+          if git diff --quiet && git diff --cached --quiet; then
+            echo "No folder changes to commit"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add config/projects/
+          git commit -m "chore(ci): auto-discover folder rules for ${{ steps.project.outputs.project }}"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
+
+          echo "Auto-committed discovered folder rules"

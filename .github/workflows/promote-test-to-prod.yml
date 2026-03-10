@@ -1,22 +1,32 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# Promote Test → Production — GitHub Actions Workflow
+# Promote Test -> Production — GitHub Actions Workflow
 #
-# Triggered MANUALLY with an approval gate. This is the final promotion step
-# that pushes validated Test content to the Production workspace.
+# Triggered MANUALLY with an approval gate and project selection.
+# This is the final promotion step that pushes validated Test content to
+# the Production workspace, then organizes folders.
 #
 # Flow:
-#   Dev → Test (auto) ✅ → QA validates in Test → Manual trigger → Test → Prod
+#   Dev -> Test (manual) -> QA validates in Test -> Manual trigger -> Test -> Prod
 #
-# Usage: Actions → "Promote Test → Production" → Run workflow
+# Usage: Actions -> "Promote Test to Production" -> Run workflow
 #
 # Ref: https://learn.microsoft.com/en-us/fabric/cicd/deployment-pipelines/
 # ─────────────────────────────────────────────────────────────────────────────
 
-name: Promote Test → Production
+name: Promote Test to Production
+run-name: "Promote ${{ inputs.project }} — Test → Production"
 
 on:
   workflow_dispatch:
     inputs:
+      project:
+        description: 'Project to promote'
+        required: true
+        type: choice
+        options:
+          - demo
+          - sales_analytics
+          # ➕ Add new projects here
       confirm_promotion:
         description: 'Type "PROMOTE" to confirm production deployment'
         required: true
@@ -27,39 +37,54 @@ on:
         default: 'Production promotion via GitHub Actions'
         type: string
 
-# Only one production promotion at a time
 concurrency:
   group: promote-test-to-prod
   cancel-in-progress: false
 
 jobs:
   promote-test-to-prod:
-    name: Promote Test → Production
+    name: "Promote ${{ inputs.project }} — Test → Production"
     runs-on: ubuntu-latest
-    # Safety: require explicit confirmation
     if: github.event.inputs.confirm_promotion == 'PROMOTE'
+    timeout-minutes: 30
+    permissions:
+      contents: read
 
     env:
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
       SP_OBJECT_ID: ${{ secrets.SP_OBJECT_ID }}
+      FABRIC_CAPACITY_ID: ${{ secrets.FABRIC_CAPACITY_ID }}
+      FABRIC_CAPACITY_ID_TEST: ${{ secrets.FABRIC_CAPACITY_ID_TEST }}
+      FABRIC_CAPACITY_ID_PROD: ${{ secrets.FABRIC_CAPACITY_ID_PROD }}
       PROJECT_PREFIX: ${{ vars.PROJECT_PREFIX || 'fabric-cicd-demo' }}
+      # Governance principals
+      ADDITIONAL_ADMIN_PRINCIPAL_ID: ${{ secrets.ADDITIONAL_ADMIN_PRINCIPAL_ID }}
+      ADDITIONAL_CONTRIBUTOR_PRINCIPAL_ID: ${{ secrets.ADDITIONAL_CONTRIBUTOR_PRINCIPAL_ID }}
+      # Project-specific principals
+      DEMO_ADMIN_ID: ${{ secrets.DEMO_ADMIN_ID }}
+      DEMO_MEMBERS_ID: ${{ secrets.DEMO_MEMBERS_ID }}
+      SALES_ANALYTICS_ADMIN_ID: ${{ secrets.SALES_ANALYTICS_ADMIN_ID }}
+      SALES_ANALYTICS_MEMBERS_ID: ${{ secrets.SALES_ANALYTICS_MEMBERS_ID }}
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
       - name: Setup Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
         with:
           python-version: '3.11'
 
-      - name: Install CLI tool
+      - name: Install dependencies
+        env:
+          GIT_AUTH_TOKEN: ${{ secrets.FABRIC_GITHUB_TOKEN }}
         run: |
           pip install --upgrade pip
+          pip install pyyaml
           pip install ms-fabric-cli==${{ vars.FABRIC_CLI_VERSION || '1.3.1' }}
-          pip install "git+https://${{ secrets.FABRIC_GITHUB_TOKEN }}@${{ vars.CLI_REPO_URL || 'github.com/BralaBee-LEIT/usf_fabric_cli_cicd_codebase' }}.git@${{ vars.CLI_REPO_REF || 'v1.8.0' }}"
+          pip install "git+https://${GIT_AUTH_TOKEN}@${{ vars.CLI_REPO_URL || 'github.com/BralaBee-LEIT/usf_fabric_cli_cicd_codebase' }}.git@${{ vars.CLI_REPO_REF || 'v1.8.0' }}"
 
       - name: Verify credentials
         run: |
@@ -69,36 +94,117 @@ jobs:
               exit 1
             fi
           done
-          echo "✅ Credentials verified"
+          echo "Credentials verified"
 
-      - name: Promote Test → Production
+      - name: Promote Test to Production
         env:
           DEPLOY_NOTE: ${{ inputs.deployment_note }}
         run: |
-          PIPELINE_NAME=$(python -c "import os, re, yaml; config = yaml.safe_load(open('config/projects/demo/base_workspace.yaml')); name = config.get('deployment_pipeline', {}).get('pipeline_name', ''); name = re.sub(r'\\\$\{(\w+)\}', lambda m: os.environ.get(m.group(1), m.group(0)), name); print(name)")
+          PROJECT="${{ inputs.project }}"
+          CONFIG_FILE="config/projects/${PROJECT}/base_workspace.yaml"
 
-          if [ -z "$PIPELINE_NAME" ]; then
-            echo "::error::No deployment_pipeline.pipeline_name found in config"
+          if [ ! -f "$CONFIG_FILE" ]; then
+            echo "::error::Config not found: $CONFIG_FILE"
             exit 1
           fi
 
-          echo "🚀 Promoting via pipeline: $PIPELINE_NAME"
-          echo "   Source: Test → Target: Production"
-          echo "   Note: $DEPLOY_NOTE"
+          PIPELINE_NAME=$(python3 -c "
+          import os, re, yaml
+          config = yaml.safe_load(open('$CONFIG_FILE'))
+          name = config.get('deployment_pipeline', {}).get('pipeline_name', '')
+          name = re.sub(r'\\\$\{(\w+)\}', lambda m: os.environ.get(m.group(1), m.group(0)), name)
+          print(name)
+          ")
 
+          if [ -z "$PIPELINE_NAME" ]; then
+            echo "::error::No deployment_pipeline.pipeline_name found in $CONFIG_FILE"
+            exit 1
+          fi
+
+          echo "Promoting via pipeline: $PIPELINE_NAME"
+          echo "  Project: $PROJECT"
+          echo "  Source: Test -> Target: Production"
+          echo "  Note: $DEPLOY_NOTE"
+
+          PROMOTE_EXIT=0
           fabric-cicd promote \
             --pipeline-name "$PIPELINE_NAME" \
             --source-stage "Test" \
             --target-stage "Production" \
-            --note "$DEPLOY_NOTE"
+            --selective \
+            --note "$DEPLOY_NOTE" || PROMOTE_EXIT=$?
+
+          if [ $PROMOTE_EXIT -eq 2 ]; then
+            echo "::notice::No deployable items found (exit code 2 = graceful skip)"
+            echo "PROMOTE_SKIPPED=true" >> $GITHUB_ENV
+          elif [ $PROMOTE_EXIT -ne 0 ]; then
+            echo "::error::Promotion failed with exit code $PROMOTE_EXIT"
+            exit $PROMOTE_EXIT
+          fi
+
+      - name: Organize Production workspace folders
+        if: env.PROMOTE_SKIPPED != 'true'
+        run: |
+          PROJECT="${{ inputs.project }}"
+          CONFIG_FILE="config/projects/${PROJECT}/base_workspace.yaml"
+
+          # Check if project has folder_rules
+          HAS_FOLDER_RULES=$(python3 -c "
+          import yaml
+          config = yaml.safe_load(open('$CONFIG_FILE'))
+          rules = config.get('folder_rules', [])
+          print('yes' if rules else 'no')
+          " 2>/dev/null || echo "no")
+
+          if [ "$HAS_FOLDER_RULES" != "yes" ]; then
+            echo "No folder_rules configured for $PROJECT — skipping organize-folders"
+            exit 0
+          fi
+
+          # Resolve production workspace name
+          PROD_WORKSPACE=$(python3 -c "
+          import os, re, yaml
+          config = yaml.safe_load(open('$CONFIG_FILE'))
+          stages = config.get('deployment_pipeline', {}).get('stages', {})
+          name = stages.get('production', {}).get('workspace_name', '')
+          name = re.sub(r'\\\$\{(\w+)\}', lambda m: os.environ.get(m.group(1), m.group(0)), name)
+          print(name)
+          " 2>/dev/null)
+
+          if [ -z "$PROD_WORKSPACE" ]; then
+            echo "::warning::No production workspace name found — skipping organize-folders"
+            exit 0
+          fi
+
+          echo "Organizing folders in Production workspace: $PROD_WORKSPACE"
+
+          ORGANIZE_EXIT=0
+          fabric-cicd organize-folders \
+            "$CONFIG_FILE" \
+            --env prod || ORGANIZE_EXIT=$?
+
+          if [ $ORGANIZE_EXIT -eq 2 ]; then
+            echo "No folder changes needed in Production workspace"
+          elif [ $ORGANIZE_EXIT -ne 0 ]; then
+            echo "::warning::organize-folders failed for Production workspace (exit code $ORGANIZE_EXIT)"
+          else
+            echo "Folders organized in Production workspace"
+          fi
+
       - name: Report promotion success
         if: success()
         run: |
-          echo "## ✅ Promotion: Test → Production" >> $GITHUB_STEP_SUMMARY
+          if [ "$PROMOTE_SKIPPED" == "true" ]; then
+            echo "## Promotion: Test -> Production (Skipped)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "> No deployable items found. Nothing to promote." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## Promotion: Test -> Production" >> $GITHUB_STEP_SUMMARY
+          fi
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|:---|:---|" >> $GITHUB_STEP_SUMMARY
-          echo "| **Pipeline** | Read from \`base_workspace.yaml\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Project** | \`${{ inputs.project }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **Source** | Test |" >> $GITHUB_STEP_SUMMARY
           echo "| **Target** | Production |" >> $GITHUB_STEP_SUMMARY
           echo "| **Note** | ${{ inputs.deployment_note }} |" >> $GITHUB_STEP_SUMMARY
@@ -107,8 +213,11 @@ jobs:
       - name: Report failure
         if: failure()
         run: |
-          echo "## ❌ Promotion Failed: Test → Production" >> $GITHUB_STEP_SUMMARY
+          echo "## Promotion Failed: Test -> Production" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|:---|:---|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Project** | \`${{ inputs.project }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "Check the logs above for details." >> $GITHUB_STEP_SUMMARY
 
   rejected:
@@ -118,7 +227,7 @@ jobs:
     steps:
       - name: Rejection notice
         run: |
-          echo "## ⚠️ Production Promotion Rejected" >> $GITHUB_STEP_SUMMARY
+          echo "## Production Promotion Rejected" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo 'You must type **PROMOTE** (exact match) to confirm.' >> $GITHUB_STEP_SUMMARY
           echo "Received: \`${{ inputs.confirm_promotion }}\`" >> $GITHUB_STEP_SUMMARY

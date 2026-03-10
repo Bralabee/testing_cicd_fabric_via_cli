@@ -9,12 +9,16 @@ implemented and ready to use — pick the one that fits your team's needs.
 
 **One consumer repo = one Fabric project.** This is how the repo ships.
 
+The template includes **7 GitHub Actions workflows**: CI, setup, feature create,
+feature cleanup, deploy-dev (auto-organize folders), promote Dev-to-Test, and
+promote Test-to-Prod.
+
 ```
-fabric_cicd_consumer_repo/          ← One repo per Fabric project
-├── .github/workflows/              ← Active workflows (single-project)
-├── config/projects/demo/
-│   ├── base_workspace.yaml
-│   └── feature_workspace_demo.yaml
+fabric_cicd_consumer_repo/          <- One repo per Fabric project
++-- .github/workflows/              <- 7 active workflows (single-project)
++-- config/projects/demo/
+|   +-- base_workspace.yaml
+|   +-- feature_workspace_demo.yaml
 ```
 
 ### When to use
@@ -27,11 +31,16 @@ fabric_cicd_consumer_repo/          ← One repo per Fabric project
 ### How it works
 | What | How |
 |:---|:---|
-| Setup workspace | Actions → "Setup Base Workspaces" → Run |
+| Setup workspace | Actions -> "Setup Base Workspaces" -> Run |
 | Feature branch | `git checkout -b feature/my-feature` |
 | Feature cleanup | Automatic on PR merge |
-| Dev → Test | Automatic on push to main (or manual if you change the trigger) |
-| Test → Prod | Manual dispatch, type "PROMOTE" |
+| Dev folders organized | Automatic on push to main (via `deploy-dev.yml` running `organize-folders`) |
+| Dev -> Test | Automatic on push to main (or manual dispatch) |
+| Test -> Prod | Manual dispatch, type "PROMOTE" |
+
+> **deploy-dev.yml** is a shared workflow that auto-runs after every push to `main`.
+> It calls `fabric-cicd organize-folders` to move items back into their correct
+> folders after Fabric Git Sync (which always drops items at the workspace root).
 
 ### Branch convention
 ```
@@ -46,18 +55,24 @@ Examples: `feature/add-gold-table`, `feature/fix-pipeline`
 **One consumer repo = multiple Fabric projects.** Workflows in
 `.github/multi-project-workflows/` handle project selection automatically.
 
+The multi-project option also uses **7 workflows** but with project selection
+dropdowns and matrix strategies for parallel operations. The `deploy-dev.yml`
+workflow auto-detects which projects were changed in a push to `main` and runs
+`organize-folders` only on affected workspaces. The `discover-folders` feature
+(available in CI) auto-discovers new folders from feature workspaces.
+
 ```
 fabric_cicd_consumer_repo/
-├── .github/
-│   ├── workflows/                    ← Replace with multi-project versions
-│   └── multi-project-workflows/      ← Source of truth for Option B
-├── config/projects/
-│   ├── demo/                         ← Project 1
-│   │   ├── base_workspace.yaml
-│   │   └── feature_workspace_demo.yaml
-│   └── sales_analytics/             ← Project 2
-│       ├── base_workspace.yaml
-│       └── feature_workspace.yaml
++-- .github/
+|   +-- workflows/                    <- Replace with multi-project versions
+|   +-- multi-project-workflows/      <- Source of truth for Option B
++-- config/projects/
+|   +-- demo/                         <- Project 1
+|   |   +-- base_workspace.yaml
+|   |   +-- feature_workspace_demo.yaml
+|   +-- sales_analytics/             <- Project 2
+|       +-- base_workspace.yaml
+|       +-- feature_workspace.yaml
 ```
 
 ### When to use
@@ -70,11 +85,12 @@ fabric_cicd_consumer_repo/
 ### How it works
 | What | How |
 |:---|:---|
-| Setup workspace | Actions → "Setup Base Workspaces" → **select project** → Run |
+| Setup workspace | Actions -> "Setup Base Workspaces" -> **select project** -> Run |
 | Feature branch | `git checkout -b feature/<project>/<feature-name>` |
 | Feature cleanup | Automatic on PR merge (project extracted from branch name) |
-| Dev → Test | All projects promoted in parallel on push to main |
-| Test → Prod | Manual dispatch → **select project** → type "PROMOTE" |
+| Dev folders organized | Automatic on push to main (only changed projects, via `deploy-dev.yml`) |
+| Dev -> Test | Manual dispatch -> **select project** -> Run |
+| Test -> Prod | Manual dispatch -> **select project** -> type "PROMOTE" |
 
 ### Branch convention
 ```
@@ -129,7 +145,8 @@ git add -A && git commit -m "revert: switch back to single-project workflows"
 | **Secrets isolation** | Full (per-repo secrets) | Shared (all projects use same SP) |
 | **Branch naming** | `feature/<name>` | `feature/<project>/<name>` |
 | **Setup workflow** | Deploys the one project | Select project from dropdown |
-| **Promotion** | One project promoted | All projects promoted in parallel (matrix) |
+| **Folder organization** | Auto on push to main | Auto on push to main (only changed projects) |
+| **Promotion** | One project promoted | Select project from dropdown |
 | **Adding a project** | Fork/copy the repo | Add config folder + update choice lists |
 | **CODEOWNERS** | Per-repo | Shared (can use path-based rules) |
 | **Complexity** | Simple | Moderate |
@@ -155,7 +172,7 @@ git add -A && git commit -m "revert: switch back to single-project workflows"
    - `.github/workflows/setup-base-workspaces.yml` → `inputs.project.options`
    - `.github/workflows/promote-test-to-prod.yml` → `inputs.project.options`
 
-   The `promote-dev-to-test.yml` auto-discovers projects — no change needed.
+   The `deploy-dev.yml` and `promote-dev-to-test.yml` auto-discover projects -- no change needed.
 
 4. **Run initial setup:**
    ```
@@ -177,3 +194,45 @@ In addition to the standard repo variables, Option B supports:
 |:---|:---|:---|
 | `DEFAULT_PROJECT` | `demo` | Fallback project when branch name doesn't include a project segment |
 | `FEATURE_WORKSPACE_CONFIG` | *(auto-discovered)* | Override: force all feature workspaces to use a specific config |
+
+---
+
+## Key Features (Both Options)
+
+### deploy-dev.yml -- Auto-Organize Folders
+
+The `deploy-dev.yml` workflow runs automatically on every push to `main`. It calls
+`fabric-cicd organize-folders` to move Fabric items back into their correct folders
+after Git Sync.
+
+**Why this is needed**: Fabric Git Sync does not preserve folder assignments. When
+content syncs into a workspace, all items land at the workspace root. The
+`organize-folders` command reads `folder_rules` from `base_workspace.yaml` and moves
+items into the designated folders.
+
+In Option B (multi-project), the workflow uses `git diff` to detect which projects
+were changed in the push and only organizes affected workspaces.
+
+### discover-folders -- Auto-Detect New Folders
+
+The `discover-folders` CLI command (and optional CI job) scans feature workspaces for
+new folders and item-to-folder mappings not yet in the YAML config. When run in CI on
+PRs from `feature/*` branches, it auto-commits updates to the PR branch -- ensuring
+`folder_rules` are current before merge.
+
+```bash
+# Manual discovery
+fabric-cicd discover-folders config/projects/<project>/base_workspace.yaml \
+    --branch feature/<project>/<description>
+
+# Dry run
+fabric-cicd discover-folders config/projects/<project>/base_workspace.yaml \
+    --workspace "My Feature Workspace" --dry-run
+```
+
+### scaffold -- Import Existing Workspaces
+
+The `fabric-cicd scaffold` command (and `make scaffold` target) reads a live Fabric
+workspace and generates YAML config templates. This is the fastest way to bring
+existing workspaces under CI/CD management. See
+[Onboarding Existing Workspaces](ONBOARDING_EXISTING_WORKSPACES.md) for the full guide.
