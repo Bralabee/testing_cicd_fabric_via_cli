@@ -25,8 +25,8 @@
 
 | Project Slug | Config Path | Git Sync Directory | Description |
 |---|---|---|---|
-| `demo` | `config/projects/demo/` | `/demo` | Basic demo workspace (Bronze/Silver/Gold) |
-| `sales_analytics` | `config/projects/sales_analytics/` | `/sales_analytics` | Example second project (Bronze/Silver/Gold/Curated) |
+| `demo` | `config/projects/demo/` | `/demo` | Basic demo workspace (8-folder convention) |
+| `sales_analytics` | `config/projects/sales_analytics/` | `/sales_analytics` | Example second project (8-folder convention) |
 
 ---
 

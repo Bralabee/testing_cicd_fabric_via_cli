@@ -140,7 +140,7 @@ This template ships with two demo projects pre-configured:
 
 | Project | Config Path | Description |
 |---------|-------------|-------------|
-| `demo` | `config/projects/demo/` | Basic demo workspace (Bronze/Silver/Gold folders) |
-| `sales_analytics` | `config/projects/sales_analytics/` | Example second project (Bronze/Silver/Gold/Curated folders) |
+| `demo` | `config/projects/demo/` | Basic demo workspace (8-folder convention) |
+| `sales_analytics` | `config/projects/sales_analytics/` | Example second project (8-folder convention) |
 
 These are meant as starting points. Rename, modify, or delete them to suit your needs.

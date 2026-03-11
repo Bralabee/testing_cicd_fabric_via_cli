@@ -33,6 +33,7 @@ fabric_cicd_test_repo/
 |   +-- 00_START_HERE.md
 |   +-- 04_QUICK_REFERENCE.md
 |   +-- 07_CONSUMER_REPO_SETUP_GUIDE.md
+|   +-- E2E_VALIDATION_REPORT.md
 |   +-- ONBOARDING_EXISTING_WORKSPACES.md
 |   +-- REPLICATION_GUIDE.md
 |   +-- WORKFLOW_OPTIONS.md
