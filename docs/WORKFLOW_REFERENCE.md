@@ -1,6 +1,6 @@
 # Fabric CI/CD -- Workflow Reference (Template Repo)
 
-> **Generated**: 9 March 2026 -- validated against CLI v1.8.2 and consumer repo template
+> **Generated**: 9 March 2026 -- validated against CLI v1.8.3 and consumer repo template
 
 ---
 
@@ -10,7 +10,7 @@
 
 | Role | Responsibility | Day-to-Day |
 |------|---------------|------------|
-| **Platform Engineer** | Maintains the CLI tool (`usf_fabric_cli_cicd`, currently v1.8.2). Pushes version updates, tags releases, and updates the `CLI_REPO_REF` variable in consumer repos. | Develops in the **product repo** (`usf_fabric_cli_cicd`). Never touches consumer configs. |
+| **Platform Engineer** | Maintains the CLI tool (`usf_fabric_cli_cicd`, currently v1.8.3). Pushes version updates, tags releases, and updates the `CLI_REPO_REF` variable in consumer repos. | Develops in the **product repo** (`usf_fabric_cli_cicd`). Never touches consumer configs. |
 | **Data Engineer** | Day-to-day feature development -- creating branches, building pipelines, notebooks, and lakehouses inside Fabric. Interacts exclusively through the **consumer repo** via GitHub. | Works in the **consumer repo**. Never installs or runs the CLI locally (GitHub Actions handles everything). |
 | **Project Admin** | One-time setup per project -- runs `make new-project`, configures secrets in GitHub, and runs the "Setup Base Workspaces" workflow. | Works in GitHub Settings -> Secrets/Variables and the Actions UI. |
 
@@ -18,7 +18,7 @@
 
 | Repository | Purpose | Contains |
 |---|---|---|
-| **Product repo** (`usf_fabric_cli_cicd`) | The CLI tool itself. Installed at workflow runtime via `pip install git+...@v1.8.2`. | Python source code, services, utilities, templates. 14 CLI commands: `deploy`, `validate`, `diagnose`, `destroy`, `promote`, `onboard`, `generate`, `list-workspaces`, `list-items`, `bulk-destroy`, `organize-folders`, `init-github-repo`, `scaffold`, `discover-folders`. |
+| **Product repo** (`usf_fabric_cli_cicd`) | The CLI tool itself. Installed at workflow runtime via `pip install git+...@v1.8.3`. | Python source code, services, utilities, templates. 14 CLI commands: `deploy`, `validate`, `diagnose`, `destroy`, `promote`, `onboard`, `generate`, `list-workspaces`, `list-items`, `bulk-destroy`, `organize-folders`, `init-github-repo`, `scaffold`, `discover-folders`. |
 | **Consumer repo** (this template) | Where teams interact. Config + workflows only -- no application code, no CLI source. | `config/projects/<name>/base_workspace.yaml` + `feature_workspace.yaml` per project. 7 GitHub Actions workflows. Project root directories (`/demo/`, `/sales_analytics/`, etc.) that map to Fabric workspace Git sync directories. |
 
 ### Current Template Projects
@@ -98,7 +98,7 @@ The YAML configs use `${VAR_NAME}` syntax for variable substitution. The variabl
 | Type | Where Set | Visibility | Examples |
 |---|---|---|---|
 | **GitHub Secrets** | Settings -> Secrets -> Actions | Write-once, never viewable after creation | `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `FABRIC_CAPACITY_ID` |
-| **GitHub Variables** | Settings -> Variables -> Actions | Visible to anyone with repo access | `PROJECT_PREFIX`, `CLI_REPO_REF` (e.g., `v1.8.2`), `FABRIC_CLI_VERSION` |
+| **GitHub Variables** | Settings -> Variables -> Actions | Visible to anyone with repo access | `PROJECT_PREFIX`, `CLI_REPO_REF` (e.g., `v1.8.3`), `FABRIC_CLI_VERSION` |
 
 ### Required Secrets per Consumer Repo
 

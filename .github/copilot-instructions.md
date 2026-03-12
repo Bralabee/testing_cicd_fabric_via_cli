@@ -19,7 +19,7 @@ PHASE 2 — FEATURE DEVELOPMENT (per feature):
     → feature-workspace-cleanup.yml → Workspace destroyed, capacity freed
 
 PHASE 3 — PROMOTION (after merge):
-  Push to main → promote-dev-to-test.yml → Auto-promote Dev → Test
+  workflow_dispatch → promote-dev-to-test.yml → Manual promote Dev → Test
   workflow_dispatch → promote-test-to-prod.yml → Manual promote Test → Prod
 ```
 
@@ -92,8 +92,8 @@ Configure in **Settings → Secrets and variables → Actions**:
 - **Exit code 2**: Indicates safety block — workspace was NOT deleted because it contains items
 
 ### Promote Dev → Test (`promote-dev-to-test.yml`)
-- **Trigger**: Push to `main` (auto, after PR merge)
-- **Action**: Waits for Fabric Git Sync, then promotes via Deployment Pipeline
+- **Trigger**: `workflow_dispatch` (manual)
+- **Action**: Promotes Dev stage content to Test via Deployment Pipeline
 - **Config**: Reads `pipeline_name` from `base_workspace.yaml`
 
 ### Promote Test → Prod (`promote-test-to-prod.yml`)
@@ -123,7 +123,7 @@ Configure in **Settings → Secrets and variables → Actions**:
 
 ## 🔗 Related Projects
 
-- **usf_fabric_cli_cicd**: The CLI library this repo consumes (v1.8.2)
+- **usf_fabric_cli_cicd**: The CLI library this repo consumes (v1.8.3)
 - **usf-fabric-cicd**: Legacy monolith version
 
 ## 🔄 CI/CD Protocols (MANDATORY)

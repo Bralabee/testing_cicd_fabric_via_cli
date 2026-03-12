@@ -587,13 +587,13 @@ scaffold: ## Generate config template from a live workspace (workspace="<Name>" 
 		echo -e "$(BOLD)Examples:$(RESET)"; \
 		echo -e "  make scaffold workspace=\"EDP [DEV]\""; \
 		echo -e "  make scaffold workspace=\"HR Analytics [DEV]\" slug=hr_analytics"; \
-		echo -e "  make scaffold workspace=\"EDP [DEV]\" feature=true pipeline=\"EDP - Pipeline\""; \
+		echo -e "  make scaffold workspace=\"EDP [DEV]\" pipeline=\"EDP - Pipeline\" feature=true"; \
 		echo ""; \
 		echo -e "$(BOLD)Parameters:$(RESET)"; \
 		echo -e "  $(CYAN)workspace$(RESET)  Name of the live Fabric workspace to scan (required)"; \
 		echo -e "  $(CYAN)slug$(RESET)       Template slug for the output directory (default: derived from workspace)"; \
-		echo -e "  $(CYAN)feature$(RESET)    Also generate feature_workspace.yaml (feature=true)"; \
-		echo -e "  $(CYAN)pipeline$(RESET)   Pipeline name for deployment_pipeline section (pipeline=\"<Name>\")"; \
+		echo -e "  $(CYAN)feature$(RESET)    (Required for CI/CD flow) Set feature=true to also generate feature_workspace.yaml"; \
+		echo -e "  $(CYAN)pipeline$(RESET)   (Required for Prod promotion) Pipeline name for deployment_pipeline section"; \
 		echo ""; \
 		echo -e "$(BOLD)Output:$(RESET)"; \
 		echo -e "  config/projects/_templates/<slug>/base_workspace.yaml"; \

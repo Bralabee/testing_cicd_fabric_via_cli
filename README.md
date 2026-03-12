@@ -4,7 +4,7 @@
 
 > **Reusable**: This repo is designed to be forked/copied for any Fabric project.
 > Customize via GitHub repo variables and YAML configs -- no code changes needed.
-> **CLI Version**: v1.8.2
+> **CLI Version**: v1.8.3
 
 ## Repository Structure
 
@@ -139,7 +139,7 @@ Configure in **Settings -> Secrets and variables -> Actions -> Variables tab**:
 |:---|:---|:---|
 | `PROJECT_PREFIX` | `fabric-cicd-demo` | Naming prefix for all workspaces and pipelines |
 | `CLI_REPO_URL` | `github.com/BralaBee-LEIT/usf_fabric_cli_cicd_codebase` | URL to CLI repo (without `https://`) |
-| `CLI_REPO_REF` | `v1.8.2` | Git ref (branch/tag) for CLI install |
+| `CLI_REPO_REF` | `v1.8.3` | Git ref (branch/tag) for CLI install |
 | `FABRIC_CLI_VERSION` | `1.3.1` | Microsoft Fabric CLI version |
 | `FEATURE_WORKSPACE_CONFIG` | *(auto-discovered)* | Override path to feature workspace config |
 
