@@ -603,6 +603,8 @@ scaffold: ## Generate config template from a live workspace (workspace="<Name>" 
 		echo -e "  make scaffold workspace=\"HR Analytics [DEV]\" slug=hr_analytics"; \
 		echo -e "  make scaffold workspace=\"EDP [DEV]\" pipeline=\"EDP - Pipeline\" feature=true"; \
 		echo ""; \
+		echo -e "$(YELLOW)Note: Do not put spaces around the '=' sign (e.g., workspace= \"...\").$(RESET)"; \
+		echo ""; \
 		echo -e "$(BOLD)Parameters:$(RESET)"; \
 		echo -e "  $(CYAN)workspace$(RESET)  Name of the live Fabric workspace to scan (required)"; \
 		echo -e "  $(CYAN)slug$(RESET)       Template slug for the output directory (default: derived from workspace)"; \
