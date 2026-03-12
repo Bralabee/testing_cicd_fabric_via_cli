@@ -68,7 +68,7 @@ help: ## Show this help message
 	@echo ""
 	@echo -e "$(BOLD)━━━ Scaffold (from live workspace) ━━━$(RESET)"
 	@echo -e "  $(GREEN)make scaffold$(RESET)          Generate a config template from an existing Fabric workspace"
-	@echo -e "                        $(DIM)workspace=\"<Workspace Name>\" [slug=<project_slug>]$(RESET)"
+	@echo -e "                        $(DIM)workspace=\"<Workspace Name>\" [slug=<project_slug>] [feature=true] [pipeline=\"<Name>\"]$(RESET)"
 	@echo -e "                        $(DIM)Output: config/projects/_templates/<slug>/$(RESET)"
 	@echo ""
 	@echo -e "$(BOLD)━━━ Project Management ━━━$(RESET)"
@@ -335,8 +335,15 @@ list-projects: ## List all configured projects
 .PHONY: validate
 validate: ## Validate project config files (project=<name>)
 	@if [ -z "$(project)" ]; then \
-		echo -e "$(RED)ERROR: project= is required$(RESET)"; \
-		echo -e "$(DIM)Usage: make validate project=finance$(RESET)"; \
+		echo ""; \
+		printf "\033[31mERROR: Missing required parameter 'project'\033[0m\n"; \
+		echo ""; \
+		printf "\033[1mUsage:\033[0m\n"; \
+		printf "  make validate project=<project_slug>\n"; \
+		echo ""; \
+		printf "\033[1mExample:\033[0m\n"; \
+		printf "  make validate project=finance\n"; \
+		echo ""; \
 		exit 1; \
 	fi
 	@echo ""
@@ -457,8 +464,15 @@ print(' '.join(missing)) if missing else sys.exit(0) \
 .PHONY: show-secrets
 show-secrets: ## Show required GitHub secrets for a project (project=<name>)
 	@if [ -z "$(project)" ]; then \
-		echo -e "$(RED)ERROR: project= is required$(RESET)"; \
-		echo -e "$(DIM)Usage: make show-secrets project=finance$(RESET)"; \
+		echo ""; \
+		printf "\033[31mERROR: Missing required parameter 'project'\033[0m\n"; \
+		echo ""; \
+		printf "\033[1mUsage:\033[0m\n"; \
+		printf "  make show-secrets project=<project_slug>\n"; \
+		echo ""; \
+		printf "\033[1mExample:\033[0m\n"; \
+		printf "  make show-secrets project=finance\n"; \
+		echo ""; \
 		exit 1; \
 	fi
 	@UPPER=$$(echo "$(project)" | tr '[:lower:]' '[:upper:]'); \
@@ -576,13 +590,13 @@ check-structure: ## Verify repo structure is correct
 # ═══════════════════════════════════════════════════════════════════════════════
 
 .PHONY: scaffold
-scaffold: ## Generate config template from a live workspace (workspace="<Name>" [slug=<slug>])
+scaffold: ## Generate config template from a live workspace (workspace="<Name>" [slug=<slug>] [feature=true] [pipeline="<Name>"])
 	@if [ -z "$(workspace)" ]; then \
 		echo ""; \
 		echo -e "$(RED)ERROR: Missing required parameter 'workspace'$(RESET)"; \
 		echo ""; \
 		echo -e "$(BOLD)Usage:$(RESET)"; \
-		echo -e "  make scaffold workspace=\"<Workspace Name>\" [slug=<template_slug>]"; \
+		echo -e "  make scaffold workspace=\"<Workspace Name>\" [slug=<template_slug>] [feature=true] [pipeline=\"<Name>\"]"; \
 		echo ""; \
 		echo -e "$(BOLD)Examples:$(RESET)"; \
 		echo -e "  make scaffold workspace=\"EDP [DEV]\""; \
@@ -724,13 +738,16 @@ status: ## Show current branch, remote, and working tree status
 feature: ## Create a feature branch (project=<slug> name=<description>)
 	@if [ -z "$(project)" ]; then \
 		echo ""; \
-		echo -e "$(RED)ERROR: Missing required parameter 'project'$(RESET)"; \
+		printf "\033[31mERROR: Missing required parameter 'project'\033[0m\n"; \
 		echo ""; \
-		echo -e "$(BOLD)Usage:$(RESET)"; \
-		echo -e "  make feature project=<project_slug> name=<description>"; \
+		printf "\033[1mUsage:\033[0m\n"; \
+		printf "  make feature project=<project_slug> name=\"<description>\"\n"; \
 		echo ""; \
-		echo -e "$(BOLD)Example:$(RESET)"; \
-		echo -e "  make feature project=finance name=add-silver-notebook"; \
+		printf "\033[1mExample:\033[0m\n"; \
+		printf "  make feature project=finance name=\"add new report\"\n"; \
+		echo ""; \
+		exit 1; \
+	fi
 		echo -e "  $(DIM)→ Creates branch: feature/finance/add-silver-notebook$(RESET)"; \
 		echo ""; \
 		echo -e "$(BOLD)Why this convention?$(RESET)"; \
@@ -789,14 +806,16 @@ feature: ## Create a feature branch (project=<slug> name=<description>)
 commit: ## Stage all changes and commit (msg="<message>")
 	@if [ -z "$(msg)" ]; then \
 		echo ""; \
-		echo -e "$(RED)ERROR: Missing required parameter 'msg'$(RESET)"; \
+		printf "\033[31mERROR: Missing required parameter 'msg'\033[0m\n"; \
 		echo ""; \
-		echo -e "$(BOLD)Usage:$(RESET)"; \
-		echo -e "  make commit msg=\"<commit message>\""; \
+		printf "\033[1mUsage:\033[0m\n"; \
+		printf "  make commit msg=\"<commit message>\"\n"; \
 		echo ""; \
-		echo -e "$(BOLD)Examples (Conventional Commits):$(RESET)"; \
-		echo -e "  make commit msg=\"feat: add silver layer notebook\""; \
-		echo -e "  make commit msg=\"fix: correct capacity ID in prod config\""; \
+		printf "\033[1mExample:\033[0m\n"; \
+		printf "  make commit msg=\"feat: added new pipeline\"\n"; \
+		echo ""; \
+		exit 1; \
+	fi
 		echo -e "  make commit msg=\"chore: onboard hr_analytics project\""; \
 		echo -e "  make commit msg=\"docs: update deployment guide\""; \
 		echo ""; \
@@ -840,8 +859,16 @@ commit: ## Stage all changes and commit (msg="<message>")
 commit-project: ## Stage and commit a new/modified project (project=<name>)
 	@if [ -z "$(project)" ]; then \
 		echo ""; \
-		echo -e "$(RED)ERROR: Missing required parameter 'project'$(RESET)"; \
-		echo -e "$(DIM)Usage: make commit-project project=finance$(RESET)"; \
+		printf "\033[31mERROR: Missing required parameter 'project'\033[0m\n"; \
+		echo ""; \
+		printf "\033[1mUsage:\033[0m\n"; \
+		printf "  make commit-project project=<project_slug>\n"; \
+		echo ""; \
+		printf "\033[1mExample:\033[0m\n"; \
+		printf "  make commit-project project=finance\n"; \
+		echo ""; \
+		exit 1; \
+	fi
 		exit 1; \
 	fi
 	@echo ""
@@ -911,13 +938,13 @@ push: ## Push current branch to remote (with tracking)
 push-new: ## First push — add remote origin and push main (remote=<github_url>)
 	@if [ -z "$(remote)" ]; then \
 		echo ""; \
-		echo -e "$(RED)ERROR: Missing required parameter 'remote'$(RESET)"; \
+		printf "\033[31mERROR: Missing required parameter 'remote'\033[0m\n"; \
 		echo ""; \
-		echo -e "$(BOLD)Usage:$(RESET)"; \
-		echo -e "  make push-new remote=https://github.com/<org>/<repo>.git"; \
+		printf "\033[1mUsage:\033[0m\n"; \
+		printf "  make push-new remote=<github_url>\n"; \
 		echo ""; \
-		echo -e "$(BOLD)Or use GitHub CLI (creates the repo for you):$(RESET)"; \
-		echo -e "  gh repo create <org>/<repo> --private --source . --push"; \
+		printf "\033[1mExample:\033[0m\n"; \
+		printf "  make push-new remote=https://github.com/org/repo.git\n"; \
 		echo ""; \
 		exit 1; \
 	fi
@@ -960,11 +987,16 @@ pr: ## Create a Pull Request to main (title="<title>" [body="<body>"])
 	fi
 	@if [ -z "$(title)" ]; then \
 		echo ""; \
-		echo -e "$(RED)ERROR: Missing required parameter 'title'$(RESET)"; \
+		printf "\033[31mERROR: Missing required parameter 'title'\033[0m\n"; \
 		echo ""; \
-		echo -e "$(BOLD)Usage:$(RESET)"; \
-		echo -e "  make pr title=\"feat: add silver layer notebook\""; \
-		echo -e "  make pr title=\"fix: correct config\" body=\"Fixes the capacity ID\""; \
+		printf "\033[1mUsage:\033[0m\n"; \
+		printf "  make pr title=\"<PR title>\" [body=\"<description>\"]\n"; \
+		echo ""; \
+		printf "\033[1mExample:\033[0m\n"; \
+		printf "  make pr title=\"feat: add new finance data product\" body=\"Resolves #123\"\n"; \
+		echo ""; \
+		exit 1; \
+	fi
 		echo ""; \
 		exit 1; \
 	fi
@@ -1063,8 +1095,15 @@ _validate-new-repo-params:
 		exit 1; \
 	fi
 	@if [ -z "$(display)" ]; then \
-		echo -e "$(RED)ERROR: Missing required parameter 'display'$(RESET)"; \
-		echo -e "$(DIM)Usage: make new-repo name=$(name) project=$(project) display=\"<Name>\"$(RESET)"; \
+		echo ""; \
+		printf "\033[31mERROR: Missing required parameter 'title'\033[0m\n"; \
+		echo ""; \
+		printf "\033[1mUsage:\033[0m\n"; \
+		printf "  make onboard-project project=<slug> display=\"Display Name\"\n"; \
+		echo ""; \
+		printf "\033[1mExample:\033[0m\n"; \
+		printf "  make onboard-project project=sales display=\"Sales Analytics\"\n"; \
+		echo ""; \
 		exit 1; \
 	fi
 
@@ -1091,8 +1130,15 @@ _validate-new-project-params:
 		exit 1; \
 	fi
 	@if [ -z "$(display)" ]; then \
-		echo -e "$(RED)ERROR: Missing required parameter 'display'$(RESET)"; \
-		echo -e "$(DIM)Usage: make new-project project=$(project) display=\"<Name>\"$(RESET)"; \
+		echo ""; \
+		printf "\033[31mERROR: Missing required parameter 'title'\033[0m\n"; \
+		echo ""; \
+		printf "\033[1mUsage:\033[0m\n"; \
+		printf "  make onboard-project project=<slug> display=\"Display Name\"\n"; \
+		echo ""; \
+		printf "\033[1mExample:\033[0m\n"; \
+		printf "  make onboard-project project=sales display=\"Sales Analytics\"\n"; \
+		echo ""; \
 		exit 1; \
 	fi
 
