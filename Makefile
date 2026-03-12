@@ -69,10 +69,8 @@ help: ## Show this help message
 	@echo -e "$(BOLD)━━━ Scaffold (from live workspace) ━━━$(RESET)"
 	@echo -e "  $(GREEN)make scaffold$(RESET)          Generate a config template from an existing Fabric workspace"
 	@echo -e "                        $(DIM)workspace=\"<Workspace Name>\" [slug=<project_slug>] [feature=true] [pipeline=\"<Name>\"]$(RESET)"
-	@echo -e "                        $(YELLOW)Examples:$(RESET)"
-	@echo -e "                        $(DIM)make scaffold workspace=\"EDP [DEV]\"$(RESET)"
-	@echo -e "                        $(DIM)make scaffold workspace=\"HR Analytics [DEV]\" slug=hr_analytics$(RESET)"
-	@echo -e "                        $(DIM)make scaffold workspace=\"Sales\" feature=true pipeline=\"Sales Pipeline\"$(RESET)"
+	@echo -e "                        $(YELLOW)Example:$(RESET)"
+	@echo -e "                        $(DIM)make scaffold workspace=\"Sales\" slug=sales_analytics feature=true pipeline=\"Sales Pipeline\"$(RESET)"
 	@echo -e "                        $(DIM)Output: config/projects/_templates/<slug>/$(RESET)"
 	@echo ""
 	@echo -e "$(BOLD)━━━ Project Management ━━━$(RESET)"
@@ -586,10 +584,8 @@ check-structure: ## Verify repo structure is correct
 #   feature    — (optional) Also generate feature_workspace.yaml (feature=true)
 #   pipeline   — (optional) Also generate pipeline config (pipeline=true)
 #
-# Examples:
-#   make scaffold workspace="EDP [DEV]"
-#   make scaffold workspace="HR Analytics [DEV]" slug=hr_analytics
-#   make scaffold workspace="EDP [DEV]" feature=true pipeline=true
+# Example:
+#   make scaffold workspace="Sales" slug=sales_analytics feature=true pipeline="Sales Pipeline"
 #
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -602,10 +598,8 @@ scaffold: ## Generate config template from a live workspace (workspace="<Name>" 
 		echo -e "$(BOLD)Usage:$(RESET)"; \
 		echo -e "  make scaffold workspace=\"<Workspace Name>\" [slug=<template_slug>] [feature=true] [pipeline=\"<Name>\"]"; \
 		echo ""; \
-		echo -e "$(BOLD)Examples:$(RESET)"; \
-		echo -e "  make scaffold workspace=\"EDP [DEV]\""; \
-		echo -e "  make scaffold workspace=\"HR Analytics [DEV]\" slug=hr_analytics"; \
-		echo -e "  make scaffold workspace=\"EDP [DEV]\" pipeline=\"EDP - Pipeline\" feature=true"; \
+		echo -e "$(BOLD)Example:$(RESET)"; \
+		echo -e "  make scaffold workspace=\"Sales\" slug=sales_analytics feature=true pipeline=\"Sales Pipeline\""; \
 		echo ""; \
 		echo -e "$(YELLOW)Note: Do not put spaces around the '=' sign (e.g., workspace= \"...\").$(RESET)"; \
 		echo ""; \
@@ -647,11 +641,13 @@ scaffold: ## Generate config template from a live workspace (workspace="<Name>" 
 	fi; \
 	echo -e "  Output:    $(DIM)$$TEMPLATES_DIR/$(RESET)"; \
 	echo ""; \
-	eval $$CMD; \
+	echo -e "$(BOLD)Running command:$(RESET) $$CMD"; \
+		eval $$CMD; \
 	EXIT_CODE=$$?; \
 	if [ $$EXIT_CODE -eq 0 ]; then \
 		echo ""; \
 		echo -e "$(GREEN)$(BOLD)Scaffold complete$(RESET)"; \
+			echo -e "You can now use this template to scaffold new projects."; \
 		echo ""; \
 		if [ -n "$$SLUG" ]; then \
 			SLUG_DIR="$$SLUG"; \
@@ -667,7 +663,8 @@ scaffold: ## Generate config template from a live workspace (workspace="<Name>" 
 	else \
 		echo ""; \
 		echo -e "$(RED)$(BOLD)Scaffold failed (exit code $$EXIT_CODE)$(RESET)"; \
-		echo -e "$(DIM)Check that fabric-cicd is installed and credentials are set.$(RESET)"; \
+			echo -e "$(DIM)Command that failed: $$CMD$(RESET)"; \
+			echo -e "$(DIM)Check that fabric-cicd is installed and credentials are set in the .env file or environment variables.$(RESET)"; \
 		echo ""; \
 		exit $$EXIT_CODE; \
 	fi
@@ -744,13 +741,19 @@ status: ## Show current branch, remote, and working tree status
 feature: ## Create a feature branch (project=<slug> name=<description>)
 	@if [ -z "$(project)" ]; then \
 		echo ""; \
-		printf "\033[31mERROR: Missing required parameter 'project'\033[0m\n"; \
+		printf "$(RED)ERROR: Missing required parameter 'project'$(RESET)\n"; \
 		echo ""; \
-		printf "\033[1mUsage:\033[0m\n"; \
+		printf "$(BOLD)Usage:$(RESET)\n"; \
 		printf "  make feature project=<project_slug> name=\"<description>\"\n"; \
 		echo ""; \
-		printf "\033[1mExample:\033[0m\n"; \
+		printf "$(BOLD)Example:$(RESET)\n"; \
 		printf "  make feature project=finance name=\"add new report\"\n"; \
+		echo ""; \
+		printf "$(YELLOW)Note: Do not put spaces around the '=' sign (e.g., param= \"...\").$(RESET)\n"; \
+		echo ""; \
+		printf "$(BOLD)Parameters:$(RESET)\n"; \
+		printf "  $(CYAN)project$(RESET)   Project slug (lowercase + underscores, e.g., hr_analytics)\n"; \
+		printf "  $(CYAN)name$(RESET)      Feature description (e.g., \"add-silver-notebook\")\n"; \
 		echo ""; \
 		exit 1; \
 	fi
@@ -764,9 +767,21 @@ feature: ## Create a feature branch (project=<slug> name=<description>)
 		exit 1; \
 	fi
 	@if [ -z "$(name)" ]; then \
-		echo -e "$(RED)ERROR: Missing required parameter 'name'$(RESET)"; \
-		echo -e "$(DIM)Usage: make feature project=$(project) name=<description>$(RESET)"; \
-		echo -e "$(DIM)Example: make feature project=$(project) name=add-silver-notebook$(RESET)"; \
+		echo ""; \
+		printf "$(RED)ERROR: Missing required parameter 'name'$(RESET)\n"; \
+		echo ""; \
+		printf "$(BOLD)Usage:$(RESET)\n"; \
+		printf "  make feature project=<project_slug> name=\"<description>\"\n"; \
+		echo ""; \
+		printf "$(BOLD)Example:$(RESET)\n"; \
+		printf "  make feature project=finance name=\"add new report\"\n"; \
+		echo ""; \
+		printf "$(YELLOW)Note: Do not put spaces around the '=' sign (e.g., param= \"...\").$(RESET)\n"; \
+		echo ""; \
+		printf "$(BOLD)Parameters:$(RESET)\n"; \
+		printf "  $(CYAN)project$(RESET)   Project slug (lowercase + underscores, e.g., hr_analytics)\n"; \
+		printf "  $(CYAN)name$(RESET)      Feature description (e.g., \"add-silver-notebook\")\n"; \
+		echo ""; \
 		exit 1; \
 	fi
 	@# ── Validate project exists ──────────────────────────────────────────
@@ -812,13 +827,18 @@ feature: ## Create a feature branch (project=<slug> name=<description>)
 commit: ## Stage all changes and commit (msg="<message>")
 	@if [ -z "$(msg)" ]; then \
 		echo ""; \
-		printf "\033[31mERROR: Missing required parameter 'msg'\033[0m\n"; \
+		printf "$(RED)ERROR: Missing required parameter 'msg'$(RESET)\n"; \
 		echo ""; \
-		printf "\033[1mUsage:\033[0m\n"; \
+		printf "$(BOLD)Usage:$(RESET)\n"; \
 		printf "  make commit msg=\"<commit message>\"\n"; \
 		echo ""; \
-		printf "\033[1mExample:\033[0m\n"; \
-		printf "  make commit msg=\"feat: added new pipeline\"\n"; \
+		printf "$(BOLD)Example:$(RESET)\n"; \
+		printf "  make commit msg=\"feat: added silver layer notebook\"\n"; \
+		echo ""; \
+		printf "$(YELLOW)Note: Do not put spaces around the '=' sign (e.g., param= \"...\").$(RESET)\n"; \
+		echo ""; \
+		printf "$(BOLD)Parameters:$(RESET)\n"; \
+		printf "  $(CYAN)msg$(RESET)       Standard commit message (conventional commits preferred)\n"; \
 		echo ""; \
 		exit 1; \
 	fi
@@ -865,13 +885,19 @@ commit: ## Stage all changes and commit (msg="<message>")
 commit-project: ## Stage and commit a new/modified project (project=<name>)
 	@if [ -z "$(project)" ]; then \
 		echo ""; \
-		printf "\033[31mERROR: Missing required parameter 'project'\033[0m\n"; \
+		printf "$(RED)ERROR: Missing required parameter 'project'$(RESET)\n"; \
 		echo ""; \
-		printf "\033[1mUsage:\033[0m\n"; \
-		printf "  make commit-project project=<project_slug>\n"; \
+		printf "$(BOLD)Usage:$(RESET)\n"; \
+		printf "  make commit-project project=<slug> msg=\"<commit message>\"\n"; \
 		echo ""; \
-		printf "\033[1mExample:\033[0m\n"; \
-		printf "  make commit-project project=finance\n"; \
+		printf "$(BOLD)Example:$(RESET)\n"; \
+		printf "  make commit-project project=finance msg=\"feat: update pipeline\"\n"; \
+		echo ""; \
+		printf "$(YELLOW)Note: Do not put spaces around the '=' sign (e.g., param= \"...\").$(RESET)\n"; \
+		echo ""; \
+		printf "$(BOLD)Parameters:$(RESET)\n"; \
+		printf "  $(CYAN)project$(RESET)   Project slug to limit commit scope\n"; \
+		printf "  $(CYAN)msg$(RESET)       Standard commit message\n"; \
 		echo ""; \
 		exit 1; \
 	fi
@@ -993,13 +1019,18 @@ pr: ## Create a Pull Request to main (title="<title>" [body="<body>"])
 	fi
 	@if [ -z "$(title)" ]; then \
 		echo ""; \
-		printf "\033[31mERROR: Missing required parameter 'title'\033[0m\n"; \
+		printf "$(RED)ERROR: Missing required parameter 'title'$(RESET)\n"; \
 		echo ""; \
-		printf "\033[1mUsage:\033[0m\n"; \
-		printf "  make pr title=\"<PR title>\" [body=\"<description>\"]\n"; \
+		printf "$(BOLD)Usage:$(RESET)\n"; \
+		printf "  make pr title=\"<PR title>\"\n"; \
 		echo ""; \
-		printf "\033[1mExample:\033[0m\n"; \
-		printf "  make pr title=\"feat: add new finance data product\" body=\"Resolves #123\"\n"; \
+		printf "$(BOLD)Example:$(RESET)\n"; \
+		printf "  make pr title=\"feat: Add finance reporting view\"\n"; \
+		echo ""; \
+		printf "$(YELLOW)Note: Do not put spaces around the '=' sign (e.g., param= \"...\").$(RESET)\n"; \
+		echo ""; \
+		printf "$(BOLD)Parameters:$(RESET)\n"; \
+		printf "  $(CYAN)title$(RESET)     Pull request title\n"; \
 		echo ""; \
 		exit 1; \
 	fi
@@ -1080,35 +1111,58 @@ diff: ## Show uncommitted changes
 _validate-new-repo-params:
 	@if [ -z "$(name)" ]; then \
 		echo ""; \
-		echo -e "$(RED)ERROR: Missing required parameter 'name'$(RESET)"; \
+		printf "$(RED)ERROR: Missing required parameter 'name'$(RESET)\n"; \
 		echo ""; \
-		echo -e "$(BOLD)Usage:$(RESET)"; \
-		echo -e "  make new-repo name=<repo_name> project=<project_slug> display=\"<Display Name>\""; \
+		printf "$(BOLD)Usage:$(RESET)\n"; \
+		printf "  make new-repo name=<repo_name> project=<project_slug> display=\"<Display Name>\"\n"; \
 		echo ""; \
-		echo -e "$(BOLD)Example:$(RESET)"; \
-		echo -e "  make new-repo name=acme-fabric-cicd project=finance display=\"Finance Reporting\""; \
+		printf "$(BOLD)Example:$(RESET)\n"; \
+		printf "  make new-repo name=acme-fabric-cicd project=finance display=\"Finance Reporting\"\n"; \
 		echo ""; \
-		echo -e "$(BOLD)Parameters:$(RESET)"; \
-		echo -e "  $(CYAN)name$(RESET)     Repository directory name (alphanumeric + hyphens)"; \
-		echo -e "  $(CYAN)project$(RESET)  First project slug (lowercase + underscores, e.g., finance)"; \
-		echo -e "  $(CYAN)display$(RESET)  Human-readable name used in workspace titles (e.g., \"Finance\")"; \
+		printf "$(YELLOW)Note: Do not put spaces around the '=' sign (e.g., param= \"...\").$(RESET)\n"; \
+		echo ""; \
+		printf "$(BOLD)Parameters:$(RESET)\n"; \
+		printf "  $(CYAN)name$(RESET)      Repository directory name (alphanumeric + hyphens)\n"; \
+		printf "  $(CYAN)project$(RESET)   First project slug (lowercase + underscores, e.g., finance)\n"; \
+		printf "  $(CYAN)display$(RESET)   Human-readable name used in workspace titles (e.g., \"Finance\")\n"; \
 		echo ""; \
 		exit 1; \
 	fi
 	@if [ -z "$(project)" ]; then \
-		echo -e "$(RED)ERROR: Missing required parameter 'project'$(RESET)"; \
-		echo -e "$(DIM)Usage: make new-repo name=$(name) project=<slug> display=\"<Name>\"$(RESET)"; \
+		echo ""; \
+		printf "$(RED)ERROR: Missing required parameter 'project'$(RESET)\n"; \
+		echo ""; \
+		printf "$(BOLD)Usage:$(RESET)\n"; \
+		printf "  make new-repo name=<repo_name> project=<project_slug> display=\"<Display Name>\"\n"; \
+		echo ""; \
+		printf "$(BOLD)Example:$(RESET)\n"; \
+		printf "  make new-repo name=acme-fabric-cicd project=finance display=\"Finance Reporting\"\n"; \
+		echo ""; \
+		printf "$(YELLOW)Note: Do not put spaces around the '=' sign (e.g., param= \"...\").$(RESET)\n"; \
+		echo ""; \
+		printf "$(BOLD)Parameters:$(RESET)\n"; \
+		printf "  $(CYAN)name$(RESET)      Repository directory name (alphanumeric + hyphens)\n"; \
+		printf "  $(CYAN)project$(RESET)   First project slug (lowercase + underscores, e.g., finance)\n"; \
+		printf "  $(CYAN)display$(RESET)   Human-readable name used in workspace titles (e.g., \"Finance\")\n"; \
+		echo ""; \
 		exit 1; \
 	fi
 	@if [ -z "$(display)" ]; then \
 		echo ""; \
-		printf "\033[31mERROR: Missing required parameter 'title'\033[0m\n"; \
+		printf "$(RED)ERROR: Missing required parameter 'display'$(RESET)\n"; \
 		echo ""; \
-		printf "\033[1mUsage:\033[0m\n"; \
-		printf "  make onboard-project project=<slug> display=\"Display Name\"\n"; \
+		printf "$(BOLD)Usage:$(RESET)\n"; \
+		printf "  make new-repo name=<repo_name> project=<project_slug> display=\"<Display Name>\"\n"; \
 		echo ""; \
-		printf "\033[1mExample:\033[0m\n"; \
-		printf "  make onboard-project project=sales display=\"Sales Analytics\"\n"; \
+		printf "$(BOLD)Example:$(RESET)\n"; \
+		printf "  make new-repo name=acme-fabric-cicd project=finance display=\"Finance Reporting\"\n"; \
+		echo ""; \
+		printf "$(YELLOW)Note: Do not put spaces around the '=' sign (e.g., param= \"...\").$(RESET)\n"; \
+		echo ""; \
+		printf "$(BOLD)Parameters:$(RESET)\n"; \
+		printf "  $(CYAN)name$(RESET)      Repository directory name (alphanumeric + hyphens)\n"; \
+		printf "  $(CYAN)project$(RESET)   First project slug (lowercase + underscores, e.g., finance)\n"; \
+		printf "  $(CYAN)display$(RESET)   Human-readable name used in workspace titles (e.g., \"Finance\")\n"; \
 		echo ""; \
 		exit 1; \
 	fi
@@ -1117,33 +1171,39 @@ _validate-new-repo-params:
 _validate-new-project-params:
 	@if [ -z "$(project)" ]; then \
 		echo ""; \
-		echo -e "$(RED)ERROR: Missing required parameter 'project'$(RESET)"; \
+		printf "$(RED)ERROR: Missing required parameter 'project'$(RESET)\n"; \
 		echo ""; \
-		echo -e "$(BOLD)Usage:$(RESET)"; \
-		echo -e "  make new-project project=<project_slug> display=\"<Display Name>\" [template=<name>]"; \
+		printf "$(BOLD)Usage:$(RESET)\n"; \
+		printf "  make new-project project=<project_slug> display=\"<Display Name>\" [template=<name>]\n"; \
 		echo ""; \
-		echo -e "$(BOLD)Examples:$(RESET)"; \
-		echo -e "  make new-project project=hr_analytics display=\"HR Analytics\""; \
-		echo -e "  make new-project project=hr_analytics display=\"HR Analytics\" template=my_scaffold"; \
+		printf "$(BOLD)Example:$(RESET)\n"; \
+		printf "  make new-project project=hr_analytics display=\"HR Analytics\" template=my_scaffold\n"; \
 		echo ""; \
-		echo -e "$(BOLD)Parameters:$(RESET)"; \
-		echo -e "  $(CYAN)project$(RESET)   Project slug (lowercase + underscores, e.g., hr_analytics)"; \
-		echo -e "            This becomes the config folder name AND the Git sync directory name."; \
-		echo -e "  $(CYAN)display$(RESET)   Human-readable name (e.g., \"HR Analytics\")"; \
-		echo -e "            Used in workspace names like \"HR Analytics [DEV]\", pipeline names, etc."; \
-		echo -e "  $(CYAN)template$(RESET)  Optional. Template name from _templates/ (default: standard_data_product)"; \
+		printf "$(YELLOW)Note: Do not put spaces around the '=' sign (e.g., param= \"...\").$(RESET)\n"; \
+		echo ""; \
+		printf "$(BOLD)Parameters:$(RESET)\n"; \
+		printf "  $(CYAN)project$(RESET)   Project slug (lowercase + underscores, e.g., hr_analytics)\n            This becomes the config folder name AND the Git sync directory name.\n"; \
+		printf "  $(CYAN)display$(RESET)   Human-readable name (e.g., \"HR Analytics\")\n            Used in workspace names like \"HR Analytics [DEV]\", pipeline names, etc.\n"; \
+		printf "  $(CYAN)template$(RESET)  Optional. Template name from _templates/ (default: standard_data_product)\n"; \
 		echo ""; \
 		exit 1; \
 	fi
 	@if [ -z "$(display)" ]; then \
 		echo ""; \
-		printf "\033[31mERROR: Missing required parameter 'title'\033[0m\n"; \
+		printf "$(RED)ERROR: Missing required parameter 'display'$(RESET)\n"; \
 		echo ""; \
-		printf "\033[1mUsage:\033[0m\n"; \
-		printf "  make onboard-project project=<slug> display=\"Display Name\"\n"; \
+		printf "$(BOLD)Usage:$(RESET)\n"; \
+		printf "  make new-project project=<project_slug> display=\"<Display Name>\" [template=<name>]\n"; \
 		echo ""; \
-		printf "\033[1mExample:\033[0m\n"; \
-		printf "  make onboard-project project=sales display=\"Sales Analytics\"\n"; \
+		printf "$(BOLD)Example:$(RESET)\n"; \
+		printf "  make new-project project=hr_analytics display=\"HR Analytics\" template=my_scaffold\n"; \
+		echo ""; \
+		printf "$(YELLOW)Note: Do not put spaces around the '=' sign (e.g., param= \"...\").$(RESET)\n"; \
+		echo ""; \
+		printf "$(BOLD)Parameters:$(RESET)\n"; \
+		printf "  $(CYAN)project$(RESET)   Project slug (lowercase + underscores, e.g., hr_analytics)\n            This becomes the config folder name AND the Git sync directory name.\n"; \
+		printf "  $(CYAN)display$(RESET)   Human-readable name (e.g., \"HR Analytics\")\n            Used in workspace names like \"HR Analytics [DEV]\", pipeline names, etc.\n"; \
+		printf "  $(CYAN)template$(RESET)  Optional. Template name from _templates/ (default: standard_data_product)\n"; \
 		echo ""; \
 		exit 1; \
 	fi
