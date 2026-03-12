@@ -22,11 +22,11 @@
 
 ### Fixed
 - Orphaned `type: Group` lines in project config YAML files
-- Multi-project workflow CLI version bumped from v1.7.16 to v1.8.0
+- Multi-project workflow CLI version bumped from v1.7.16 to v1.8.1
 
-## [2026-03-09] — v1.8.0 CLI Update
+## [2026-03-09] — v1.8.1 CLI Update
 
 ### Changed
-- Updated CLI version references to v1.8.0 in active workflows
+- Updated CLI version references to v1.8.1 in active workflows
 
 ## [Previous] — See git log for earlier changes

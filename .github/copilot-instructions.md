@@ -123,7 +123,7 @@ Configure in **Settings → Secrets and variables → Actions**:
 
 ## 🔗 Related Projects
 
-- **usf_fabric_cli_cicd**: The CLI library this repo consumes (v1.8.0)
+- **usf_fabric_cli_cicd**: The CLI library this repo consumes (v1.8.1)
 - **usf-fabric-cicd**: Legacy monolith version
 
 ## 🔄 CI/CD Protocols (MANDATORY)
