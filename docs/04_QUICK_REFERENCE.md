@@ -58,7 +58,7 @@ Configure in **Settings -> Secrets and variables -> Actions -> Variables**.
 |----------|---------|-------------|
 | `PROJECT_PREFIX` | `fabric-cicd-demo` | Workspace name prefix (e.g., `acme-data`) |
 | `CLI_REPO_URL` | `github.com/BralaBee-LEIT/usf_fabric_cli_cicd_codebase` | CLI repo URL (no `https://`) |
-| `CLI_REPO_REF` | `v1.8.1` | CLI Git tag or branch to install |
+| `CLI_REPO_REF` | `v1.8.2` | CLI Git tag or branch to install |
 | `FABRIC_CLI_VERSION` | `1.3.1` | Microsoft Fabric CLI version |
 | `FEATURE_WORKSPACE_CONFIG` | *(auto-discovered)* | Override feature workspace config path |
 
@@ -139,7 +139,7 @@ git push origin feature/demo/add-gold-table
 # 5. For Test -> Prod: Actions -> Promote Test to Prod -> type "PROMOTE"
 ```
 
-### Scaffold Config from an Existing Workspace (v1.8.1+)
+### Scaffold Config from an Existing Workspace (v1.8.2+)
 
 > **Scaffold reads only** -- it does not create or modify anything in Fabric.
 
@@ -179,7 +179,7 @@ fabric-cicd discover-folders config/projects/<project>/base_workspace.yaml \
 When a new CLI version is released:
 
 1. Update `CLI_REPO_REF` variable: **Settings -> Variables -> Actions -> CLI_REPO_REF** -> new tag
-2. Update fallback versions in workflow files (search for `v1.8.1` in `.github/workflows/`)
+2. Update fallback versions in workflow files (search for `v1.8.2` in `.github/workflows/`)
 
 ### Manual Feature Workspace Cleanup
 

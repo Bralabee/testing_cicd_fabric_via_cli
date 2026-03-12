@@ -1,6 +1,6 @@
 # START HERE — Fabric CI/CD Consumer Repo Template
 
-> **Version**: 1.8.1 | **Last Updated**: 9 March 2026
+> **Version**: 1.8.2 | **Last Updated**: 9 March 2026
 >
 > This is the **starting point** for the consumer repository template documentation.
 > Read this page to understand what this repo does and where to go next.
@@ -32,7 +32,7 @@ changes needed.
 ```
 
 **You don't modify the CLI repo.** You configure your projects here and GitHub Actions
-installs the CLI at runtime via `pip install git+...@v1.8.1`.
+installs the CLI at runtime via `pip install git+...@v1.8.2`.
 
 ---
 
