@@ -239,6 +239,10 @@ Each project has two configs:
 feature/<project>/<description>
 ```
 
+> **Important**: Only the `feature/` prefix triggers automated workspace creation and cleanup.
+> Other prefixes like `feat/`, `fix/`, or `hotfix/` will **not** trigger the feature workspace lifecycle.
+> This is by design — use `feature/` for isolated Fabric workspace development.
+
 | Branch | Auto-detected Config | Workspace Name |
 |--------|---------------------|---------------|
 | `feature/demo/add-gold-table` | `config/projects/demo/feature_workspace_demo.yaml` | `<prefix>-dev-add-gold-table` |
